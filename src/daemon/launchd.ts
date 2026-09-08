@@ -29,6 +29,51 @@ export interface PlistInputs {
   runArgs: string[];
   /** Root directory for config/profile state. */
   channelHome: string;
+  /** Extra env vars copied into the LaunchAgent (TLS CAs, proxies, …). */
+  extraEnv?: Record<string, string>;
+}
+
+
+function extraEnvXml(
+  extraEnv: Record<string, string> | undefined,
+  escape: (s: string) => string,
+): string {
+  if (!extraEnv) return '';
+  let out = '';
+  for (const [key, value] of Object.entries(extraEnv)) {
+    if (!key || !value) continue;
+    out += `        <key>${escape(key)}</key>\n`;
+    out += `        <string>${escape(value)}</string>\n`;
+  }
+  return out;
+}
+
+/** Forward TLS / proxy env into the daemon so corporate MITM CAs keep working. */
+export function collectDaemonExtraEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of [
+    'NODE_EXTRA_CA_CERTS',
+    'SSL_CERT_FILE',
+    'HTTPS_PROXY',
+    'HTTP_PROXY',
+    'NO_PROXY',
+    'https_proxy',
+    'http_proxy',
+    'no_proxy',
+  ]) {
+    const value = env[key];
+    if (value) out[key] = value;
+  }
+  const defaultCa = '/etc/ssl/cert.pem';
+  if (!out.NODE_EXTRA_CA_CERTS && existsSync(defaultCa)) {
+    out.NODE_EXTRA_CA_CERTS = defaultCa;
+  }
+  if (!out.SSL_CERT_FILE && existsSync(defaultCa)) {
+    out.SSL_CERT_FILE = defaultCa;
+  }
+  return out;
 }
 
 export function buildPlist(inputs: PlistInputs): string {
@@ -65,7 +110,7 @@ ${argStrings}
         <string>${escape(inputs.envPath)}</string>
         <key>LARK_CHANNEL_HOME</key>
         <string>${escape(inputs.channelHome)}</string>
-    </dict>
+${extraEnvXml(inputs.extraEnv, escape)}    </dict>
 </dict>
 </plist>
 `;
@@ -83,6 +128,7 @@ export async function writePlist(profile: string, runArgs: string[] = ['run']): 
     profile,
     runArgs,
     channelHome: paths.rootDir,
+    extraEnv: collectDaemonExtraEnv(),
   });
   const plistPath = launchAgentPlistPath(profile);
   await mkdir(dirname(plistPath), { recursive: true });

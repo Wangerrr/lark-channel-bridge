@@ -18,7 +18,9 @@ web/dist/
 .idea/
 .vscode/
 
-# Local maintenance scripts and unreleased changelog are not part of the package
+# Local maintenance scripts are not part of the package
 scripts/
-CHANGELOG.md
 tests-smoke/
+
+# Accidental pnpm approve-builds leftover (not a real workspace)
+# Keep real pnpm-workspace.yaml out of this ignore if we add packages later.

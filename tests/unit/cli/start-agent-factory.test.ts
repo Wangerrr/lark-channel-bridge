@@ -31,7 +31,7 @@ describe('start runtime agent factory', () => {
       permissions: { defaultAccess: 'workspace', maxAccess: 'workspace' },
     });
     const agent = createRuntimeAgent(profile, {
-      profileDir: '/tmp/lark-channel-bridge/profiles/codex-e2e',
+      profileDir: '/tmp/lark-channel-bridge-wg1/profiles/codex-e2e',
     });
 
     expect(agent.id).toBe('codex');
@@ -53,7 +53,7 @@ describe('start runtime agent factory', () => {
         accounts: appAccount(),
         codex: { binaryPath: '/usr/local/bin/codex' },
       }),
-      { profileDir: '/tmp/lark-channel-bridge/profiles/codex-e2e' },
+      { profileDir: '/tmp/lark-channel-bridge-wg1/profiles/codex-e2e' },
     );
 
     expect(agent.id).toBe('codex');

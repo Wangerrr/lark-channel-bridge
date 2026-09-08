@@ -10,6 +10,7 @@ import {
   systemdUnitPath,
 } from './paths';
 import { paths } from '../config/paths';
+import { collectDaemonExtraEnv } from './launchd';
 
 export interface UnitInputs {
   /** Absolute path to the node binary that should run the bridge. */
@@ -28,6 +29,7 @@ export interface UnitInputs {
   runArgs: string[];
   /** Root directory for config/profile state. */
   channelHome: string;
+  extraEnv?: Record<string, string>;
 }
 
 /**
@@ -43,6 +45,18 @@ export interface UnitInputs {
  * survive logout if `loginctl enable-linger <user>` is set — we mention
  * this in the user-facing success message.
  */
+
+function extraEnvUnit(
+  extraEnv: Record<string, string> | undefined,
+  escape: (s: string) => string,
+): string {
+  if (!extraEnv) return '';
+  return Object.entries(extraEnv)
+    .filter(([key, value]) => key && value)
+    .map(([key, value]) => `Environment="${escape(key)}=${escape(value)}"`)
+    .join('\n') + (Object.keys(extraEnv).length ? '\n' : '');
+}
+
 export function buildUnit(inputs: UnitInputs): string {
   const escape = (s: string): string => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   // Profile names / flags are validated safe tokens (no spaces), so appending
@@ -62,7 +76,7 @@ StandardOutput=append:${daemonStdoutPath(inputs.profile)}
 StandardError=append:${daemonStderrPath(inputs.profile)}
 Environment="PATH=${escape(inputs.envPath)}"
 Environment="LARK_CHANNEL_HOME=${escape(inputs.channelHome)}"
-
+${extraEnvUnit(inputs.extraEnv, escape)}
 [Install]
 WantedBy=default.target
 `;
@@ -80,6 +94,7 @@ export async function writeUnit(profile: string, runArgs: string[] = ['run']): P
     profile,
     runArgs,
     channelHome: paths.rootDir,
+    extraEnv: collectDaemonExtraEnv(),
   });
   const unitPath = systemdUnitPath(profile);
   await mkdir(dirname(unitPath), { recursive: true });

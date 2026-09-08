@@ -6,6 +6,7 @@ import { detectInstalledAgents, type DetectedAgent } from '../cli/agent-detectio
 import {
   createBootstrapCodexConfig,
   createBootstrapProfileConfig,
+  createBootstrapOpenCodeConfig,
   resolveBootstrapWorkspace,
 } from '../cli/profile-bootstrap';
 import { promptPassword } from '../cli/prompt';
@@ -90,6 +91,9 @@ export function createRuntimeProfileConfig(
     ...(input.agentKind === 'codex'
       ? { codex: input.codex ?? { binaryPath: process.env.LARK_CHANNEL_CODEX_BIN ?? 'codex' } }
       : {}),
+    ...(input.agentKind === 'opencode'
+      ? { opencode: input.opencode ?? { binaryPath: process.env.LARK_CHANNEL_OPENCODE_BIN ?? 'opencode' } }
+      : {}),
   });
 }
 
@@ -108,7 +112,7 @@ export async function resolveProfileRuntime(
   if (!profile && opts.allowBootstrap) {
     const detected = await detectInstalledAgents();
     if (detected.length === 0) {
-      throw new Error('no supported local agent found; install claude or codex first');
+      throw new Error('no supported local agent found; install claude, codex, or opencode first');
     }
     if (detected.length > 1) {
       const selected = await selectDetectedAgent(detected, opts.selectAgent);
@@ -137,6 +141,9 @@ export async function resolveProfileRuntime(
     ...(migrationAgent ? { agentKind: migrationAgent } : {}),
     ...(needsMigration && migrationAgent === 'codex'
       ? { codex: await createBootstrapCodexConfig(undefined) }
+      : {}),
+    ...(needsMigration && migrationAgent === 'opencode'
+      ? { opencode: await createBootstrapOpenCodeConfig(undefined) }
       : {}),
   }, opts.handleActiveBridgeMigrationConflict);
 
@@ -395,7 +402,7 @@ function resolveBootstrapAgent(
   requestedAgent: AgentKind | undefined,
   profile: string | undefined,
 ): AgentKind | undefined {
-  return requestedAgent ?? (profile === 'codex' ? 'codex' : undefined);
+  return requestedAgent ?? (profile === 'codex' || profile === 'opencode' ? profile : undefined);
 }
 
 async function hasLegacyConfig(configPath: string): Promise<boolean> {
@@ -431,7 +438,7 @@ async function resolveBootstrapAppConfig(opts: ResolveProfileRuntimeOptions): Pr
     if (!isInteractiveTerminal()) {
       throw new Error(
         '当前没有配置，非交互模式无法完成扫码创建应用。' +
-          '请先在终端运行 `lark-channel-bridge run` 完成首次初始化，' +
+          '请先在终端运行 `lark-channel-bridge-wg1 run` 完成首次初始化，' +
           '或传入 --app-id 和 --app-secret。',
       );
     }
@@ -568,7 +575,7 @@ function formatAmbiguousAgentSelectionError(
 ): string {
   const lines = detected.map((agent) => `  - ${agent.kind}: ${agent.binaryPath}`);
   return [
-    '检测到多个本地 agent，请使用 --agent <claude|codex> 指定要初始化哪一个。',
+    '检测到多个本地 agent，请使用 --agent <claude|codex>（或 --agent opencode）指定要初始化哪一个。',
     '已检测到：',
     ...lines,
   ].join('\n');
@@ -613,7 +620,7 @@ class UserCancelledError extends Error {
 }
 
 function displayAgentKind(kind: AgentKind): string {
-  return kind === 'claude' ? 'Claude Code' : 'Codex CLI';
+  return kind === 'claude' ? 'Claude Code' : kind === 'codex' ? 'Codex CLI' : 'OpenCode';
 }
 
 async function maybeMigrateRootPlaintextSecret(

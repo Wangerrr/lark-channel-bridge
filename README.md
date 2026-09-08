@@ -1,10 +1,23 @@
-# lark-channel-bridge
+# lark-channel-bridge-wg1
 
-A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
+WG1 独立维护的 fork，基于 `lark-channel-bridge@0.7.1`，并带 OpenCode 适配。
+和上游 `zarazhangrui/lark-coding-agent-bridge` 没有官方关系，也不走那条发布线。
+
+A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code, Codex CLI, or OpenCode. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
 
 [中文 README](./README.zh.md)
 
 For a product walkthrough, see the [Feishu document](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e).
+
+## WG1 notes
+
+- CLI: `lark-channel-bridge-wg1` (does not collide with Homebrew `lark-channel-bridge@0.7.1`)
+- Config home is still `~/.lark-channel` unless you set `LARK_CHANNEL_HOME`
+- Quoted image/file messages are downloaded and passed to the agent (`--image` on Codex/OpenCode)
+- OpenCode adapter is included
+- Text mode no longer posts pre-tool progress as the whole reply
+- See [CHANGELOG](./CHANGELOG.md) for the WG1 revision list
+
 
 ## What it does
 
@@ -23,20 +36,21 @@ For a product walkthrough, see the [Feishu document](https://larkcommunity.feish
 - At least one local agent installed and logged in:
   - Claude Code: `claude`, see https://docs.anthropic.com/en/docs/claude-code/quickstart
   - Codex CLI: `codex`, see https://developers.openai.com/codex/cli
+  - OpenCode: `opencode`, see https://opencode.ai/docs/
 - A Feishu / Lark **PersonalAgent** app. The first-run QR wizard can create and bind one for you.
 
 ## Install
 
 ```bash
-npm i -g lark-channel-bridge
+npm i -g lark-channel-bridge-wg1
 # or
-pnpm add -g lark-channel-bridge
+pnpm add -g lark-channel-bridge-wg1
 ```
 
 ## First run
 
 ```bash
-lark-channel-bridge run
+lark-channel-bridge-wg1 run
 ```
 
 The first run opens a QR-code wizard:
@@ -52,9 +66,9 @@ You do not need to choose a project directory up front. The bridge creates a pro
 If you already have a PersonalAgent app, pass `--app-id` during initialization to skip app creation. The command prompts for the App Secret.
 
 ```bash
-lark-channel-bridge run --app-id cli_xxx
+lark-channel-bridge-wg1 run --app-id cli_xxx
 # or initialize and start the background service directly
-lark-channel-bridge start --app-id cli_xxx
+lark-channel-bridge-wg1 start --app-id cli_xxx
 ```
 
 For Lark global apps, add `--tenant lark`.
@@ -64,9 +78,9 @@ For Lark global apps, add `--tenant lark`.
 Use `run` for first-run setup and foreground debugging. After the bot can send and receive messages, stop the foreground process with `Ctrl-C`, then use an OS-managed service for background operation:
 
 ```bash
-lark-channel-bridge start
-lark-channel-bridge status
-lark-channel-bridge stop
+lark-channel-bridge-wg1 start
+lark-channel-bridge-wg1 status
+lark-channel-bridge-wg1 stop
 ```
 
 Install globally before using service commands. The daemon's launchd plist / systemd unit / Windows task records the bridge CLI path; if that path comes from an npm temp cache through `npx`, the daemon can break when the cache is cleaned. `run` is fine through `npx` as a one-shot foreground process.
@@ -74,34 +88,35 @@ Install globally before using service commands. The daemon's launchd plist / sys
 Service commands install a per-profile service:
 
 ```bash
-lark-channel-bridge start [--profile <name>]
-lark-channel-bridge stop [--profile <name>]
-lark-channel-bridge restart [--profile <name>]
-lark-channel-bridge status [--profile <name>]
-lark-channel-bridge unregister [--profile <name>]
+lark-channel-bridge-wg1 start [--profile <name>]
+lark-channel-bridge-wg1 stop [--profile <name>]
+lark-channel-bridge-wg1 restart [--profile <name>]
+lark-channel-bridge-wg1 status [--profile <name>]
+lark-channel-bridge-wg1 unregister [--profile <name>]
 ```
 
 Platform mapping:
-- **macOS**: launchd user agent `ai.lark-channel-bridge.bot.<profile>`
-- **Linux**: systemd user unit `lark-channel-bridge.bot.<profile>.service`
+- **macOS**: launchd user agent `ai.lark-channel-bridge-wg1.bot.<profile>`
+- **Linux**: systemd user unit `lark-channel-bridge-wg1.bot.<profile>.service`
 - **Windows**: Task Scheduler task `LarkChannelBridge.Bot.<profile>`, launched through a `.cmd` wrapper
 
 Daemon logs are under `~/.lark-channel/profiles/<profile>/logs/daemon/`.
 
-### Multiple profiles: Claude and Codex
+### Multiple profiles: Claude, Codex, and OpenCode
 
 By default, the bridge starts with the currently selected profile. Use `profile use <name>` to change it. Each profile keeps its own app credentials, sessions, working directories, and logs. Create multiple profiles only when you need to connect multiple PersonalAgent apps, or run Claude and Codex as separate bots:
 
 ```bash
-lark-channel-bridge start --profile claude --agent claude
-lark-channel-bridge start --profile codex --agent codex
+lark-channel-bridge-wg1 start --profile claude --agent claude
+lark-channel-bridge-wg1 start --profile codex --agent codex
+lark-channel-bridge-wg1 start --profile opencode --agent opencode
 ```
 
 For example, to restart only the Codex bot:
 
 ```bash
-lark-channel-bridge restart --profile codex
-lark-channel-bridge status --profile codex
+lark-channel-bridge-wg1 restart --profile codex
+lark-channel-bridge-wg1 status --profile codex
 ```
 
 ## Commands
@@ -109,24 +124,25 @@ lark-channel-bridge status --profile codex
 ### Host CLI
 
 ```text
-lark-channel-bridge run [--profile <name>] [--agent claude|codex] [--workspace <path>] [-c <config>]
-lark-channel-bridge migrate [--profile <name>] [--agent claude|codex]
-lark-channel-bridge ps
-lark-channel-bridge kill <id|#>
-lark-channel-bridge --help
+lark-channel-bridge-wg1 run [--profile <name>] [--agent claude|codex|opencode] [--workspace <path>] [-c <config>]
+lark-channel-bridge-wg1 migrate [--profile <name>] [--agent claude|codex|opencode]
+lark-channel-bridge-wg1 ps
+lark-channel-bridge-wg1 kill <id|#>
+lark-channel-bridge-wg1 --help
 ```
 
 `profile use <name>` changes the profile used by later default starts. Use these profile management commands when running separate Claude / Codex bots, connecting multiple PersonalAgent apps, or doing scripted deployment:
 
 ```bash
-lark-channel-bridge profile create claude --agent claude
-lark-channel-bridge profile create codex --agent codex
-lark-channel-bridge profile list
-lark-channel-bridge profile use <name>
-lark-channel-bridge profile remove <name>
-lark-channel-bridge profile remove <name> --purge --yes
-lark-channel-bridge profile export <name> [--output ./profile.json] [--force]
-lark-channel-bridge profile export <name> --include-secrets --yes
+lark-channel-bridge-wg1 profile create claude --agent claude
+lark-channel-bridge-wg1 profile create codex --agent codex
+lark-channel-bridge-wg1 profile create opencode --agent opencode
+lark-channel-bridge-wg1 profile list
+lark-channel-bridge-wg1 profile use <name>
+lark-channel-bridge-wg1 profile remove <name>
+lark-channel-bridge-wg1 profile remove <name> --purge --yes
+lark-channel-bridge-wg1 profile export <name> [--output ./profile.json] [--force]
+lark-channel-bridge-wg1 profile export <name> --include-secrets --yes
 ```
 
 `profile remove` archives local state by default, including the active profile. If other profiles remain, the bridge switches to the next one; if it was the last profile, the root config is cleared so the same name can be created again. `--purge --yes` permanently deletes local state. `profile export` redacts app secrets by default; `--include-secrets --yes` includes sensitive config.
@@ -210,13 +226,15 @@ This is a profile-field snippet. Do not replace the whole `config.json` with it;
 
 Mode mapping:
 
-| Bridge access | Claude permission mode | Codex mode |
+| Bridge access | Claude permission mode | Codex mode | OpenCode |
 |---|---|---|
-| `full` | `bypassPermissions` | `danger-full-access` |
-| `workspace` | `acceptEdits` | `workspace-write` |
-| `read-only` | `plan` | `read-only` |
+| `full` | `bypassPermissions` | `danger-full-access` | `--auto` |
+| `workspace` | `acceptEdits` | `workspace-write` | default permissions |
+| `read-only` | `plan` | `read-only` | `plan` agent |
 
 The legacy `sandbox` field is still readable for old configs. After the bridge saves the profile, it migrates that setting to canonical `permissions`.
+
+OpenCode uses the model configured in its own `opencode.json` by default. To select one explicitly, set the current profile's `preferences.model` to the full `provider/model` value; the bridge forwards it as `opencode run --model <provider/model>`. Leave it empty or set it to `default` to omit the flag.
 
 ## Data directories
 
@@ -330,13 +348,13 @@ By default the bridge reports **nothing**: no metrics, no logs leave your machin
 To wire up your own monitoring, point an environment variable at a module that default-exports (or exports `createAdapter`) an `AdapterFactory`:
 
 ```bash
-LARK_CHANNEL_TELEMETRY_MODULE=your-telemetry-package lark-channel-bridge start
+LARK_CHANNEL_TELEMETRY_MODULE=your-telemetry-package lark-channel-bridge-wg1 start
 ```
 
 That module receives every `log.*` event plus error/metric hooks and forwards them wherever you like. The interface is exported from the package root:
 
 ```ts
-import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'lark-channel-bridge';
+import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'lark-channel-bridge-wg1';
 
 const createAdapter: AdapterFactory = (meta) => ({
   emit(event) {/* ship event */},

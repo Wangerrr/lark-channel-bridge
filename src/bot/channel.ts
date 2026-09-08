@@ -2,10 +2,11 @@ import type {
   LarkChannel,
   LarkChannelOptions,
   NormalizedMessage,
+  ResourceDescriptor,
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { claudeCapability, codexCapability } from '../agent/capability';
+import { capabilityForProfile } from '../agent/capability';
 import { modelLabel, normalizeModelSelection, resolveModelArg } from '../agent/models';
 import {
   buildAgentPrompt,
@@ -40,7 +41,7 @@ import {
 } from '../config/schema';
 import { resolveAppSecret } from '../config/secret-resolver';
 import { log, reportMetric, withTrace } from '../core/logger';
-import { MediaCache, type LocalAttachment } from '../media/cache';
+import { MediaCache, type LocalAttachment, type ResourceRequest } from '../media/cache';
 import {
   toPolicyAttachment,
   toPromptAttachment,
@@ -74,6 +75,7 @@ import {
   CotPublisher,
   finalAnswerOnlyState,
 } from './cot';
+import { deliverableFinalReply } from '../card/final-answer';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -235,7 +237,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       cfg.accounts.app.tenant === 'lark'
         ? 'https://open.larksuite.com'
         : 'https://open.feishu.cn',
-    source: 'lark-channel-bridge',
+    source: 'lark-channel-bridge-wg1',
     logger: buildQuietLogger(),
     policy: {
       dmMode: 'open',
@@ -829,27 +831,11 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   const chatId = firstMsg.chatId;
   const threadId = firstMsg.threadId;
 
-  const resourceItems = batch.flatMap((m) =>
-    m.resources.map((r) => ({ messageId: m.messageId, resource: r })),
-  );
-  const attachments = await media.resolve(resourceItems, controls.profileConfig.attachments);
-  if (attachments.length > 0) {
-    log.info('media', 'resolved', { count: attachments.length });
-    for (const attachment of attachments) {
-      log.info('attachment', 'decision', {
-        decision: attachment.decision,
-        kind: attachment.kind,
-        hash: attachment.hash,
-        size: attachment.size,
-        sourceMessageId: attachment.sourceMessageId,
-        reason: attachment.rejectionReason,
-      });
-    }
-  }
-
   // Collect any reply-quote targets in the batch. Dedup so the same target
   // quoted by multiple messages in one batch only fetches once. Filter out
   // ids that are themselves in the batch — those are already in the prompt.
+  // Quotes must be fetched BEFORE media.resolve so image/file keys on the
+  // quoted message (phone: send image → quote → @bot) are downloaded too.
   const batchIds = new Set(batch.map((m) => m.messageId));
   const quoteTargets = [
     ...new Set(
@@ -867,6 +853,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         messageId: targetId,
         type: q.rawContentType,
         contentChars: q.content.length,
+        resources: q.resources.length,
       });
     }
   }
@@ -889,6 +876,27 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         scope,
         threadId,
         count: topicContext.length,
+        resources: topicContext.reduce((n, q) => n + q.resources.length, 0),
+      });
+    }
+  }
+
+  const resourceItems = collectResourceRequests([
+    ...batch.map((m) => ({ messageId: m.messageId, resources: m.resources })),
+    ...quotes,
+    ...topicContext,
+  ]);
+  const attachments = await media.resolve(resourceItems, controls.profileConfig.attachments);
+  if (attachments.length > 0) {
+    log.info('media', 'resolved', { count: attachments.length });
+    for (const attachment of attachments) {
+      log.info('attachment', 'decision', {
+        decision: attachment.decision,
+        kind: attachment.kind,
+        hash: attachment.hash,
+        size: attachment.size,
+        sourceMessageId: attachment.sourceMessageId,
+        reason: attachment.rejectionReason,
       });
     }
   }
@@ -955,10 +963,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     actorId: firstMsg.senderId,
     ...(threadId ? { threadId } : {}),
   };
-  const capability =
-    controls.profileConfig.agentKind === 'codex'
-      ? codexCapability(controls.profileConfig)
-      : claudeCapability(controls.profileConfig);
+  const capability = capabilityForProfile(controls.profileConfig);
   const flow = await startRunFlow({
     scopeId: scope,
     scope: scopeContext,
@@ -1450,11 +1455,19 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const body = renderText(input.state);
+  const delivered = deliverableFinalReply(input.state);
+  const state = delivered.state;
+  const body = delivered.body;
 
-  // Nothing deliverable to send (agent produced no text on a clean finish;
-  // error/interrupt/timeout keep `body` non-empty via their notices). Skip
-  // rather than post an empty card that renders as "(no content)".
+  // Clean finish with only pre-tool progress ("先选几部…") used to post that
+  // opener as the whole reply. Prefer a notice over silence or a stub.
+  if (delivered.kind === 'notice') {
+    log.warn('outbound', 'empty-final-notice', {
+      scope: input.scope,
+      mode: input.replyMode,
+      chars: body.length,
+    });
+  }
   if (!body.trim()) {
     log.info('outbound', 'skip-empty', { scope: input.scope, mode: input.replyMode });
     return;
@@ -1463,7 +1476,7 @@ async function sendFinalReply(input: {
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
       input.chatId,
-      { card: renderCard(input.state, input.cardRenderOptions) },
+      { card: renderCard(state, input.cardRenderOptions) },
       input.sendOpts,
     );
     requireMessageReceipt(result, 'card');
@@ -1891,6 +1904,22 @@ function mergeMentions(batch: NormalizedMessage[]): BridgePromptMention[] {
         ...(mention.name ? { name: mention.name } : {}),
         ...(mention.isBot !== undefined ? { isBot: mention.isBot } : {}),
       });
+    }
+  }
+  return out;
+}
+
+function collectResourceRequests(
+  sources: Array<{ messageId: string; resources?: readonly ResourceDescriptor[] }>,
+): ResourceRequest[] {
+  const seen = new Set<string>();
+  const out: ResourceRequest[] = [];
+  for (const source of sources) {
+    for (const resource of source.resources ?? []) {
+      const key = `${source.messageId}:${resource.fileKey}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ messageId: source.messageId, resource });
     }
   }
   return out;

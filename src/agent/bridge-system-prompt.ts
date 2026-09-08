@@ -2,7 +2,7 @@ import type { AgentBotIdentity } from './types';
 
 export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 
-你正在 lark-channel-bridge 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
+你正在 lark-channel-bridge-wg1 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
 
 ## bridge_context
 
@@ -29,6 +29,11 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 - 飞书机制：bot **只有被真实 @（结构化 mention）才能收到群消息**。纯文本写 "@名字"、或不带 @ 的普通回复，其他 bot 一律收不到。这条限制只针对 bot——人类用户能看到群里所有消息，回复人类不需要 @。
 - 需要某个 bot 接着处理时，必须真实 @ 它（open_id 优先从 \`bridge_context.mentions\` 里取）。除此之外**默认不要 @ 其他 bot**——互相 @ 会形成死循环；用户明确要求转交/通知某个 bot 时按要求执行。
 - 与其他 bot 对话时，没有新信息要补充就简短收尾，不要追问、不要客套往返。
+
+## final_reply
+
+给用户看的答案必须在工具都跑完之后再发。不要把「先…」「正在…」这种过程句当成终稿。
+如果还要发图，过程说明不够；没有最终正文时 bridge 不会把开场白发出去。
 
 ## quoted_message
 

@@ -1,23 +1,15 @@
 {
-  "name": "lark-channel-bridge",
-  "version": "0.7.1",
-  "description": "Bridge Feishu/Lark messenger with local CLI coding agents",
+  "name": "lark-channel-bridge-wg1",
+  "version": "0.7.1-wg1.0",
+  "description": "WG1 fork of lark-channel-bridge: Feishu/Lark messenger bridge for local CLI coding agents",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/zarazhangrui/feishu-claude-code-bridge.git"
-  },
-  "bugs": {
-    "url": "https://github.com/zarazhangrui/feishu-claude-code-bridge/issues"
-  },
-  "homepage": "https://github.com/zarazhangrui/feishu-claude-code-bridge#readme",
   "bin": {
-    "lark-channel-bridge": "./bin/lark-channel-bridge.mjs"
+    "lark-channel-bridge-wg1": "./bin/lark-channel-bridge-wg1.mjs"
   },
   "exports": {
     ".": {
@@ -104,9 +96,18 @@
     "claude",
     "claude-code",
     "codex",
+    "opencode",
     "cli",
     "channel",
     "bridge"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wangerrr/lark-channel-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Wangerrr/lark-channel-bridge/issues"
+  },
+  "homepage": "https://github.com/Wangerrr/lark-channel-bridge#readme"
 }

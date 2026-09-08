@@ -115,6 +115,29 @@ describe('Codex JSONL translator', () => {
     ]);
   });
 
+  it('emits no final_text when progress was flushed into tools and nothing followed', () => {
+    const t = new CodexJsonlTranslator();
+
+    expect(t.translate({ type: 'agent_message', message: '先选几部，再找海报。' })).toEqual([]);
+    expect(
+      t.translate({
+        type: 'item.started',
+        item: { id: 'cmd-1', type: 'command_execution', command: 'curl poster.jpg' },
+      }),
+    ).toEqual([
+      { type: 'text', delta: '先选几部，再找海报。' },
+      {
+        type: 'tool_use',
+        id: 'cmd-1',
+        name: 'command_execution',
+        input: { command: 'curl poster.jpg' },
+      },
+    ]);
+    expect(t.translate({ type: 'turn.completed' })).toEqual([
+      { type: 'done', terminationReason: 'normal' },
+    ]);
+  });
+
   it('streams earlier agent messages but reserves the last one as the final answer', () => {
     const t = new CodexJsonlTranslator();
 

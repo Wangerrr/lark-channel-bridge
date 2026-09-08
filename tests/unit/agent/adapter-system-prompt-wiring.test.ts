@@ -18,6 +18,7 @@ import {
 } from '../../../src/agent/bridge-system-prompt';
 import { ClaudeAdapter } from '../../../src/agent/claude/adapter';
 import { CodexAdapter } from '../../../src/agent/codex/adapter';
+import { OpenCodeAdapter } from '../../../src/agent/opencode/adapter';
 
 interface FakeChild extends EventEmitter {
   pid: number;
@@ -112,6 +113,22 @@ describe('CodexAdapter system prompt wiring', () => {
 
     const stdin = await readAll(child.stdin);
     expect(stdin).toBe(prefixBridgeSystemPrompt('hi', undefined));
+  });
+});
+
+describe('OpenCodeAdapter system prompt wiring', () => {
+  it('sends the full bridge prompt through stdin instead of a positional argv message', async () => {
+    const child = fakeChild();
+    spawnMock.spawnProcess.mockReturnValue(child);
+    const adapter = new OpenCodeAdapter({ binary: '/usr/local/bin/opencode' });
+    const prompt = `${'user message with XML <bridge_context>\n'.repeat(200)}done`;
+
+    adapter.run({ runId: 'r1', prompt, cwd: '/tmp' });
+
+    expect(await readAll(child.stdin)).toBe(prefixBridgeSystemPrompt(prompt, undefined));
+    const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
+    expect(args).toEqual(['run', '--format', 'json']);
+    expect(args.join('\n')).not.toContain(prompt);
   });
 });
 

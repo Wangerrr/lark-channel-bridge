@@ -164,7 +164,7 @@ export function configFormCard(opts: ConfigFormOpts): object {
               tag: 'select_static',
               name: 'model',
               initial_option: opts.model,
-              options: supportedModels(opts.agentKind).map((m) => ({
+              options: supportedModels(opts.agentKind, opts.model).map((m) => ({
                 text: { tag: 'plain_text', content: m.label },
                 value: m.value,
               })),

@@ -2,6 +2,7 @@ import type {
   ApiMessageItem,
   LarkChannel,
   RawMessageEvent,
+  ResourceDescriptor,
 } from '@larksuite/channel';
 import { normalize } from '@larksuite/channel';
 import { log } from '../core/logger';
@@ -22,6 +23,11 @@ export interface QuotedContext {
    * </forwarded_messages>` (capped at 50 items by the SDK). */
   content: string;
   rawContentType: string;
+  /** Media on the quoted message itself. Live events put these on
+   * `NormalizedMessage.resources` and the intake pipeline downloads them;
+   * reply-quotes used to drop this field, so phone "send image → quote → @bot"
+   * never produced `--image` / attachment paths. */
+  resources: ResourceDescriptor[];
 }
 
 /**
@@ -154,6 +160,7 @@ async function normalizeItemToQuoted(
       // — substitute the raw JSON so Claude can still see what was quoted.
       content: expandInteractiveCard(normalized.content, parent.body?.content),
       rawContentType: parent.msg_type ?? 'text',
+      resources: normalized.resources ?? [],
     };
   } catch (err) {
     log.warn('quote', 'normalize-failed', {

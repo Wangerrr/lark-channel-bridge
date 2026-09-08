@@ -9,7 +9,7 @@ import { paths } from '../config/paths';
  * unit name. Single-instance for now; if we ever support multiple bots
  * per machine the suffix can grow `.{appid}` without breaking installs.
  */
-export const SERVICE_NAME = 'lark-channel-bridge.bot';
+export const SERVICE_NAME = 'lark-channel-bridge-wg1.bot';
 
 /**
  * Reserved service id for the machine-wide supervisor+console daemon
@@ -83,7 +83,7 @@ export function systemdUnitPath(profile: string = paths.profile): string {
 export const WINDOWS_TASK_NAME = windowsTaskName();
 
 export function windowsTaskName(profile: string = paths.profile): string {
-  return `LarkChannelBridge.Bot.${serviceProfileId(profile)}`;
+  return `LarkChannelBridgeWg1.Bot.${serviceProfileId(profile)}`;
 }
 
 /**

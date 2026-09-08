@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute } from 'node:path';
 import type { LarkChannel, NormalizedMessage } from '@larksuite/channel';
-import { claudeCapability, codexCapability } from '../agent/capability';
+import { capabilityForProfile, type AgentCapabilityId } from '../agent/capability';
 import { DEFAULT_MODEL, normalizeModelSelection, supportedModels } from '../agent/models';
 import type { AgentAdapter } from '../agent/types';
 import type { ActiveRuns } from '../bot/active-runs';
@@ -153,7 +153,7 @@ type Handler = (args: string, ctx: CommandContext) => Promise<void>;
 
 interface ResumeCandidate {
   scopeId: string;
-  agentId: 'claude' | 'codex';
+  agentId: AgentCapabilityId;
   cwdRealpath: string;
   policyFingerprint: string;
   sessionId?: string;
@@ -592,6 +592,22 @@ async function handleResume(args: string, ctx: CommandContext): Promise<void> {
     return;
   }
 
+  if (ctx.controls.profileConfig.agentKind === 'opencode') {
+    const identity = ctx.sessionCatalogIdentity;
+    const entry = identity && ctx.sessionCatalog ? ctx.sessionCatalog.activeFor(identity) : undefined;
+    const entries = entry?.sessionId && identity
+      ? [{
+          sessionId: issueResumeCandidate(identity, { sessionId: entry.sessionId }),
+          preview: '当前 OpenCode session',
+          relTime: formatRelTime(entry.updatedAt),
+          detail: `OpenCode · ${entry.sessionId}`,
+          current: true,
+        }]
+      : [];
+    await ctx.channel.send(ctx.msg.chatId, { card: resumeCard(cwd, entries) }, commandReplyOptions(ctx));
+    return;
+  }
+
   const sessions = await listClaudeResumeHistory(ctx, cwd, limit);
   const currentSession = ctx.sessions.getRaw(ctx.scope);
   const identity = ctx.sessionCatalogIdentity;
@@ -626,7 +642,7 @@ async function applyResume(sessionId: string, ctx: CommandContext): Promise<void
       } else {
         ctx.sessionCatalog.upsertActive({
           scopeId: ctx.sessionCatalogIdentity.scopeId,
-          agentId: 'claude',
+          agentId: ctx.sessionCatalogIdentity.agentId,
           cwdRealpath: ctx.sessionCatalogIdentity.cwdRealpath,
           policyFingerprint: ctx.sessionCatalogIdentity.policyFingerprint,
           sessionId: resolved.sessionId!,
@@ -646,7 +662,7 @@ async function applyResume(sessionId: string, ctx: CommandContext): Promise<void
       return;
     }
     ctx.activeRuns.interrupt(ctx.scope);
-    if (ctx.sessionCatalogIdentity.agentId === 'claude') {
+    if (ctx.sessionCatalogIdentity.agentId === 'claude' || ctx.sessionCatalogIdentity.agentId === 'opencode') {
       ctx.sessions.set(ctx.scope, sessionId, ctx.sessionCatalogIdentity.cwdRealpath);
     }
     await reply(ctx, RESUME_APPLIED_REPLY);
@@ -699,7 +715,7 @@ function consumeResumeCandidate(
     candidate.agentId !== identity.agentId ||
     candidate.cwdRealpath !== identity.cwdRealpath ||
     candidate.policyFingerprint !== identity.policyFingerprint ||
-    (identity.agentId === 'claude' && !candidate.sessionId) ||
+    ((identity.agentId === 'claude' || identity.agentId === 'opencode') && !candidate.sessionId) ||
     (identity.agentId === 'codex' && !candidate.threadId)
   ) {
     return undefined;
@@ -813,16 +829,17 @@ async function handleStatus(_args: string, ctx: CommandContext): Promise<void> {
   const cwd = effectiveWorkspaceCwd(ctx);
   const sess = ctx.sessions.getRaw(ctx.scope);
   const isCodex = ctx.controls.profileConfig.agentKind === 'codex';
+  const isOpenCode = ctx.controls.profileConfig.agentKind === 'opencode';
   const catalogEntry =
-    isCodex && ctx.sessionCatalog && ctx.sessionCatalogIdentity
+    (isCodex || isOpenCode) && ctx.sessionCatalog && ctx.sessionCatalogIdentity
       ? ctx.sessionCatalog.activeFor(ctx.sessionCatalogIdentity)
       : undefined;
   const card = statusCard({
     profileName: ctx.controls.profile,
     cwd,
-    sessionId: isCodex ? catalogEntry?.threadId : sess?.sessionId,
-    emptySessionText: isCodex ? '(未建立)' : undefined,
-    sessionStale: !isCodex && Boolean(cwd && sess && sess.cwd !== cwd),
+    sessionId: isCodex ? catalogEntry?.threadId : isOpenCode ? catalogEntry?.sessionId : sess?.sessionId,
+    emptySessionText: isCodex || isOpenCode ? '(未建立)' : undefined,
+    sessionStale: !isCodex && !isOpenCode && Boolean(cwd && sess && sess.cwd !== cwd),
     agentName: ctx.agent.displayName,
     runtimeAccess: runtimeAccessStatus(ctx.controls.profileConfig),
     larkCliStatus: await larkCliStatus(ctx),
@@ -1127,10 +1144,7 @@ async function handleDoctor(args: string, ctx: CommandContext): Promise<void> {
   }
   doctorLastByOperator.set(rateKey, now);
 
-  const capability =
-    ctx.controls.profileConfig.agentKind === 'codex'
-      ? codexCapability(ctx.controls.profileConfig)
-      : claudeCapability(ctx.controls.profileConfig);
+  const capability = capabilityForProfile(ctx.controls.profileConfig);
   const policy = evaluateRunPolicy({
     scope: {
       source: 'im',
@@ -1803,7 +1817,7 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
   // tidy (resolveModelArg treats both the same way).
   const agentKind = ctx.controls.profileConfig.agentKind;
   const rawModel = String(fv.model ?? '').trim();
-  const modelValid = rawModel !== '' && supportedModels(agentKind).some((m) => m.value === rawModel);
+  const modelValid = rawModel !== '' && (agentKind === 'opencode' || supportedModels(agentKind).some((m) => m.value === rawModel));
   const modelSelection = modelValid
     ? rawModel
     : normalizeModelSelection(agentKind, ctx.controls.cfg.preferences?.model);

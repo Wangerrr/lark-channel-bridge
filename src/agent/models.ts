@@ -43,9 +43,17 @@ const CODEX_MODELS: ModelOption[] = [
   { value: 'o3', label: 'o3' },
 ];
 
+const OPENCODE_MODELS: ModelOption[] = [
+  { value: DEFAULT_MODEL, label: '跟随 OpenCode 配置（不指定）' },
+];
+
 /** The model picker options for a profile's agent kind. */
-export function supportedModels(agentKind: AgentKind): ModelOption[] {
-  return agentKind === 'codex' ? CODEX_MODELS : CLAUDE_MODELS;
+export function supportedModels(agentKind: AgentKind, selected?: string): ModelOption[] {
+  const base = agentKind === 'codex' ? CODEX_MODELS : agentKind === 'opencode' ? OPENCODE_MODELS : CLAUDE_MODELS;
+  if (agentKind === 'opencode' && selected && selected !== DEFAULT_MODEL && !base.some((m) => m.value === selected)) {
+    return [...base, { value: selected, label: `当前配置（${selected}）` }];
+  }
+  return base;
 }
 
 /** True when the selection means "use the agent default" (no `--model`). */
@@ -65,6 +73,7 @@ export function normalizeModelSelection(
   value: string | undefined,
 ): string {
   if (isDefaultModel(value)) return DEFAULT_MODEL;
+  if (agentKind === 'opencode') return value?.trim() || DEFAULT_MODEL;
   return supportedModels(agentKind).some((m) => m.value === value)
     ? (value as string)
     : DEFAULT_MODEL;
@@ -85,5 +94,5 @@ export function resolveModelArg(
 /** Picker label for a stored value, for display in the saved-config card. */
 export function modelLabel(agentKind: AgentKind, value: string | undefined): string {
   const normalized = normalizeModelSelection(agentKind, value);
-  return supportedModels(agentKind).find((m) => m.value === normalized)?.label ?? normalized;
+  return supportedModels(agentKind, normalized).find((m) => m.value === normalized)?.label ?? normalized;
 }

@@ -1,10 +1,23 @@
-# lark-channel-bridge
+# lark-channel-bridge-wg1
 
-把飞书 / Lark 消息和本地 Claude Code 或 Codex CLI 打通的轻量 bot。用一条命令启动，扫码绑定 PersonalAgent 应用，然后在飞书里和本机编程助手对话，让它读图、处理文件、改代码。
+WG1 独立维护的 fork，基于 `lark-channel-bridge@0.7.1`，并带 OpenCode 适配。
+和上游 `zarazhangrui/lark-coding-agent-bridge` 没有官方关系，也不走那条发布线。
+
+把飞书 / Lark 消息和本地 Claude Code、Codex CLI 或 OpenCode 打通的轻量 bot。用一条命令启动，扫码绑定 PersonalAgent 应用，然后在飞书里和本机编程助手对话，让它读图、处理文件、改代码。
 
 [English README](./README.md)
 
 关于能实现的效果，详情可以阅读[飞书文档](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e)
+
+## WG1 说明
+
+- 命令行是 `lark-channel-bridge-wg1`，不会和正在跑的 Homebrew `lark-channel-bridge@0.7.1` 抢名字
+- 配置目录仍是 `~/.lark-channel`（可用 `LARK_CHANNEL_HOME` 改）
+- 引用图片/文件会下载后交给 agent（Codex/OpenCode 走 `--image`）
+- 带 OpenCode 适配
+- text 模式不会再把「先选几部…」这种过程句当成整轮回复
+- 修订记录见 [CHANGELOG](./CHANGELOG.md)
+
 
 ## 主要功能
 
@@ -23,20 +36,21 @@
 - 本机至少安装并登录一个 agent：
   - Claude Code：`claude`，安装说明：https://docs.anthropic.com/en/docs/claude-code/quickstart
   - Codex CLI：`codex`，安装说明：https://developers.openai.com/codex/cli
+  - OpenCode：`opencode`，安装说明：https://opencode.ai/docs/
 - 一个飞书 / Lark PersonalAgent 应用。首次启动的扫码向导可以帮你创建并绑定。
 
 ## 安装
 
 ```bash
-npm i -g lark-channel-bridge
+npm i -g lark-channel-bridge-wg1
 # 或
-pnpm add -g lark-channel-bridge
+pnpm add -g lark-channel-bridge-wg1
 ```
 
 ## 首次启动
 
 ```bash
-lark-channel-bridge run
+lark-channel-bridge-wg1 run
 ```
 
 第一次运行会进入扫码向导：
@@ -52,9 +66,9 @@ lark-channel-bridge run
 如果已经有 PersonalAgent app，可以在初始化时传 `--app-id` 跳过创建应用流程；命令会提示输入 App Secret。
 
 ```bash
-lark-channel-bridge run --app-id cli_xxx
+lark-channel-bridge-wg1 run --app-id cli_xxx
 # 或直接初始化并启动后台服务
-lark-channel-bridge start --app-id cli_xxx
+lark-channel-bridge-wg1 start --app-id cli_xxx
 ```
 
 Lark 国际版应用可加 `--tenant lark`。
@@ -64,9 +78,9 @@ Lark 国际版应用可加 `--tenant lark`。
 `run` 适合首次配置和前台调试。确认 bot 能正常收发消息后，先用 `Ctrl-C` 停掉前台进程，再用系统服务常驻后台：
 
 ```bash
-lark-channel-bridge start
-lark-channel-bridge status
-lark-channel-bridge stop
+lark-channel-bridge-wg1 start
+lark-channel-bridge-wg1 status
+lark-channel-bridge-wg1 stop
 ```
 
 服务层命令必须先全局安装，不能直接用 `npx`。daemon 的 launchd plist / systemd unit / Windows 任务会记录 bridge CLI 的路径；如果这个路径来自 npm 临时缓存，缓存清掉后 daemon 就起不来。`run` 用 `npx` 单次启动没问题。
@@ -74,34 +88,35 @@ lark-channel-bridge stop
 服务层命令按 profile 注册，每个 profile 有独立服务：
 
 ```bash
-lark-channel-bridge start [--profile <name>]
-lark-channel-bridge stop [--profile <name>]
-lark-channel-bridge restart [--profile <name>]
-lark-channel-bridge status [--profile <name>]
-lark-channel-bridge unregister [--profile <name>]
+lark-channel-bridge-wg1 start [--profile <name>]
+lark-channel-bridge-wg1 stop [--profile <name>]
+lark-channel-bridge-wg1 restart [--profile <name>]
+lark-channel-bridge-wg1 status [--profile <name>]
+lark-channel-bridge-wg1 unregister [--profile <name>]
 ```
 
 平台映射：
-- **macOS**：launchd 用户代理 `ai.lark-channel-bridge.bot.<profile>`
-- **Linux**：systemd 用户单元 `lark-channel-bridge.bot.<profile>.service`
+- **macOS**：launchd 用户代理 `ai.lark-channel-bridge-wg1.bot.<profile>`
+- **Linux**：systemd 用户单元 `lark-channel-bridge-wg1.bot.<profile>.service`
 - **Windows**：Task Scheduler 任务 `LarkChannelBridge.Bot.<profile>`，launcher 是 `.cmd`
 
 daemon 日志在 `~/.lark-channel/profiles/<profile>/logs/daemon/`。
 
-### 多 profile：分别运行 Claude 和 Codex
+### 多 profile：分别运行 Claude、Codex 和 OpenCode
 
 默认情况下，bridge 使用当前激活的 profile；可以通过 `profile use <name>` 切换。每个 profile 会维护独立的应用凭据、会话、工作目录和日志。只有在需要同时连接多个 PersonalAgent 应用，或分别运行 Claude 和 Codex 时，才需要创建多个 profile：
 
 ```bash
-lark-channel-bridge start --profile claude --agent claude
-lark-channel-bridge start --profile codex --agent codex
+lark-channel-bridge-wg1 start --profile claude --agent claude
+lark-channel-bridge-wg1 start --profile codex --agent codex
+lark-channel-bridge-wg1 start --profile opencode --agent opencode
 ```
 
 例如只重启 Codex bot：
 
 ```bash
-lark-channel-bridge restart --profile codex
-lark-channel-bridge status --profile codex
+lark-channel-bridge-wg1 restart --profile codex
+lark-channel-bridge-wg1 status --profile codex
 ```
 
 ## 命令速查
@@ -109,24 +124,25 @@ lark-channel-bridge status --profile codex
 ### 宿主 CLI
 
 ```text
-lark-channel-bridge run [--profile <name>] [--agent claude|codex] [--workspace <path>] [-c <config>]
-lark-channel-bridge migrate [--profile <name>] [--agent claude|codex]
-lark-channel-bridge ps
-lark-channel-bridge kill <id|#>
-lark-channel-bridge --help
+lark-channel-bridge-wg1 run [--profile <name>] [--agent claude|codex|opencode] [--workspace <path>] [-c <config>]
+lark-channel-bridge-wg1 migrate [--profile <name>] [--agent claude|codex|opencode]
+lark-channel-bridge-wg1 ps
+lark-channel-bridge-wg1 kill <id|#>
+lark-channel-bridge-wg1 --help
 ```
 
 `profile use <name>` 会切换后续默认启动使用的 profile。需要同时跑 Claude / Codex 两个 bot、连接多套 PersonalAgent 应用，或做脚本化部署时，再使用这些 profile 管理命令：
 
 ```bash
-lark-channel-bridge profile create claude --agent claude
-lark-channel-bridge profile create codex --agent codex
-lark-channel-bridge profile list
-lark-channel-bridge profile use <name>
-lark-channel-bridge profile remove <name>
-lark-channel-bridge profile remove <name> --purge --yes
-lark-channel-bridge profile export <name> [--output ./profile.json] [--force]
-lark-channel-bridge profile export <name> --include-secrets --yes
+lark-channel-bridge-wg1 profile create claude --agent claude
+lark-channel-bridge-wg1 profile create codex --agent codex
+lark-channel-bridge-wg1 profile create opencode --agent opencode
+lark-channel-bridge-wg1 profile list
+lark-channel-bridge-wg1 profile use <name>
+lark-channel-bridge-wg1 profile remove <name>
+lark-channel-bridge-wg1 profile remove <name> --purge --yes
+lark-channel-bridge-wg1 profile export <name> [--output ./profile.json] [--force]
+lark-channel-bridge-wg1 profile export <name> --include-secrets --yes
 ```
 
 `profile remove` 默认归档本地状态，也可以删除当前激活的 profile。若还剩其他 profile，会自动切到下一个；若这是最后一个 profile，会清空 root config，之后可以用同名重新创建。只有加 `--purge --yes` 才会永久删除。`profile export` 默认脱敏 app secret；只有加 `--include-secrets --yes` 才会导出敏感配置。
@@ -210,13 +226,15 @@ bridge 会检查所选目录存在、是目录，并且不是 `/`、Home 根、�
 
 模式映射：
 
-| Bridge access | Claude permission mode | Codex mode |
+| Bridge access | Claude permission mode | Codex mode | OpenCode |
 |---|---|---|
-| `full` | `bypassPermissions` | `danger-full-access` |
-| `workspace` | `acceptEdits` | `workspace-write` |
-| `read-only` | `plan` | `read-only` |
+| `full` | `bypassPermissions` | `danger-full-access` | `--auto` |
+| `workspace` | `acceptEdits` | `workspace-write` | default permissions |
+| `read-only` | `plan` | `read-only` | `plan` agent |
 
 旧版 `sandbox` 字段仍可读取。bridge 保存 profile 后，会把该设置迁移为 canonical `permissions`。
+
+OpenCode 的模型沿用它自己的 `opencode.json`；如果要指定模型，把完整的 `provider/model` 写入当前 profile 的 `preferences.model`，bridge 会按 `opencode run --model <provider/model>` 传递。留空或填 `default` 则不传参数。
 
 ## 数据目录
 
@@ -330,13 +348,13 @@ pnpm build
 想接自己的监控时，用环境变量指向一个 default export（或导出 `createAdapter`）`AdapterFactory` 的模块：
 
 ```bash
-LARK_CHANNEL_TELEMETRY_MODULE=your-telemetry-package lark-channel-bridge start
+LARK_CHANNEL_TELEMETRY_MODULE=your-telemetry-package lark-channel-bridge-wg1 start
 ```
 
 该模块会收到每一条 `log.*` 事件，以及错误 / 指标钩子，转发到任何你想要的地方。接口从包根导出：
 
 ```ts
-import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'lark-channel-bridge';
+import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'lark-channel-bridge-wg1';
 
 const createAdapter: AdapterFactory = (meta) => ({
   emit(event) {/* 上报事件 */},
