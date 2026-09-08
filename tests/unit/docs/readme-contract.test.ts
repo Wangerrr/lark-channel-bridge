@@ -2,30 +2,21 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('README runtime contract', () => {
-  it('documents maintained runtime surfaces in user-visible docs', async () => {
+  it('documents the WG1 CLI, quoted images, and how to run from source', async () => {
     const docs = await readDocs();
 
     for (const phrase of [
-      'per-profile service',
-      'workspaces.default',
+      'lark-channel-bridge-wg1',
+      'Quoted images',
+      '引用图片',
       '/invite user',
-      '/remove user',
       '/invite group',
-      '/remove group',
-      '/invite all group',
-      'Windows',
-      '.cmd',
-      'profile export',
-      'profile remove',
-      '--purge --yes',
-      '--include-secrets --yes',
-      'lark-cli identity policy',
-      'profile-local lark-cli directory',
-      'lark-cli 身份策略',
-      '当前 profile 的 lark-cli 目录',
+      '/cd',
       'pnpm test',
       'pnpm typecheck',
       'pnpm build',
+      'git checkout dev',
+      '~/.lark-channel',
     ]) {
       expect(docs).toContain(phrase);
     }
@@ -67,29 +58,24 @@ describe('README runtime contract', () => {
   it('documents access control commands instead of config-only access management', async () => {
     const docs = await readDocs();
 
-    expect(docs).not.toContain('`/config` only adjusts presentation preferences. Manage access in the profile config.');
-    expect(docs).not.toContain('`/config` 只调整展示偏好，不再维护访问名单。请在 profile config 里维护。');
+    expect(docs).toContain('/invite user');
+    expect(docs).toContain('/invite group');
+    expect(docs).not.toContain(
+      '`/config` only adjusts presentation preferences. Manage access in the profile config.',
+    );
+    expect(docs).not.toContain(
+      '`/config` 只调整展示偏好，不再维护访问名单。请在 profile config 里维护。',
+    );
   });
 
-  it('documents cloud-doc comments as document-scoped instead of access-gated', async () => {
+  it('does not revive removed comment-binding or sandbox docs', async () => {
     const docs = await readDocs();
 
-    expect(docs).toContain('Cloud-doc comments are document-scoped');
-    expect(docs).toContain('云文档评论按文档权限生效');
     expect(docs).not.toContain('comments.enabled');
     expect(docs).not.toContain('comments.rateLimit');
     expect(docs).not.toContain('/doc ws bind');
-  });
-
-  it('documents canonical permissions instead of recommending legacy sandbox config', async () => {
-    const docs = await readDocs();
-
-    expect(docs).toContain('"permissions"');
-    expect(docs).toContain('"defaultAccess": "full"');
-    expect(docs).toContain('"maxAccess": "full"');
-    expect(docs).toContain('legacy `sandbox`');
-    expect(docs).toContain('旧版 `sandbox`');
     expect(docs).not.toContain('"sandbox"');
+    expect(docs).not.toContain('legacy `sandbox`');
   });
 });
 

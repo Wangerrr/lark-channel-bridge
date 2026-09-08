@@ -90,7 +90,7 @@ function droppedProgressCommentary(state: RunState): boolean {
   return before.length > 0 && before.every((block) => isLikelyProgressCommentary(block.content));
 }
 
-function textBlocks(blocks: readonly Block[]): Block[] {
+function textBlocks(blocks: readonly Block[]): Array<Extract<Block, { kind: 'text' }>> {
   return blocks
     .filter((block): block is Extract<Block, { kind: 'text' }> => block.kind === 'text')
     .map((block) => ({

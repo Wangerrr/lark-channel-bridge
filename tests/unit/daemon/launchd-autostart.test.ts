@@ -45,8 +45,8 @@ describe('launchd autostart lifecycle', () => {
     // bootout alone is session-scoped — without the disable, launchd
     // re-bootstraps the plist at login and the daemon "reconnects" itself.
     expect(launchctlCalls()).toEqual([
-      expect.stringMatching(new RegExp(`^bootout gui/\\d+/${label}$`)),
-      expect.stringMatching(new RegExp(`^disable gui/\\d+/${label}$`)),
+      expect.stringMatching(new RegExp(`^bootout gui/-?\\d+/${label}$`)),
+      expect.stringMatching(new RegExp(`^disable gui/-?\\d+/${label}$`)),
     ]);
   });
 
@@ -68,8 +68,8 @@ describe('launchd autostart lifecycle', () => {
 
     // Order matters: bootstrapping a disabled job leaves it loaded but dead.
     expect(launchctlCalls()).toEqual([
-      expect.stringMatching(new RegExp(`^enable gui/\\d+/${label}$`)),
-      expect.stringMatching(new RegExp(`^bootstrap gui/\\d+ .*${label}\\.plist$`)),
+      expect.stringMatching(new RegExp(`^enable gui/-?\\d+/${label}$`)),
+      expect.stringMatching(new RegExp(`^bootstrap gui/-?\\d+ .*${label}\\.plist$`)),
     ]);
   });
 
@@ -78,7 +78,7 @@ describe('launchd autostart lifecycle', () => {
 
     adapter?.disableAutostart();
 
-    expect(launchctlCalls()).toEqual([expect.stringMatching(/^disable gui\/\d+\//)]);
+    expect(launchctlCalls()).toEqual([expect.stringMatching(/^disable gui\/-?\d+\//)]);
   });
 
   it('plain stop (used when bouncing during start) leaves autostart intact', () => {
