@@ -110,9 +110,16 @@ describe('markdown stream startup failures', () => {
 
     await h.channel.handlers.message?.(message('om_first', 'first'));
     await waitFor(() => h.agent.runOptions.length === 1);
+    // Prove the failed run drained and replied without the reaction API.
+    // Sending the follow-up before that lands races the 600ms queue debounce
+    // against a 1s budget, which flakes on slow CI runners.
+    await waitFor(() => {
+      const content = h.channel.sent.at(-1)?.content as { markdown?: string } | undefined;
+      return typeof content?.markdown === 'string' && content.markdown.includes('agent 失败');
+    });
 
     await h.channel.handlers.message?.(message('om_second', 'second'));
-    await waitFor(() => h.agent.runOptions.length === 2, 1000);
+    await waitFor(() => h.agent.runOptions.length === 2);
 
     expect(lastMarkdown(h.channel)).toContain('agent 失败');
 
