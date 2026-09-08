@@ -62,7 +62,13 @@ export function deliverableFinalReply(state: RunState): {
   };
   const body = renderText(next).trim();
   if (body) return { state: next, body, kind: 'answer' };
-  if (state.terminal === 'done' || state.terminal === 'running') {
+  // Only substitute a notice when we *dropped* progress commentary. A clean
+  // empty finish (already streamed, or the agent never wrote) must stay silent
+  // so we do not duplicate the progress stream or mask a real error reply.
+  if (
+    droppedProgressCommentary(state) &&
+    (state.terminal === 'done' || state.terminal === 'running')
+  ) {
     return {
       state: {
         ...next,
@@ -73,6 +79,15 @@ export function deliverableFinalReply(state: RunState): {
     };
   }
   return { state: next, body: '', kind: 'empty' };
+}
+
+function droppedProgressCommentary(state: RunState): boolean {
+  if (state.finalText?.trim()) return false;
+  const lastToolIndex = lastIndexOf(state.blocks, (block) => block.kind === 'tool');
+  if (lastToolIndex === -1) return false;
+  if (textBlocks(state.blocks.slice(lastToolIndex + 1)).length > 0) return false;
+  const before = textBlocks(state.blocks.slice(0, lastToolIndex));
+  return before.length > 0 && before.every((block) => isLikelyProgressCommentary(block.content));
 }
 
 function textBlocks(blocks: readonly Block[]): Block[] {

@@ -107,6 +107,12 @@ describe('deliverableFinalReply', () => {
     expect(delivered.body).toBe(EMPTY_FINAL_REPLY_NOTICE);
   });
 
+  it('stays silent when the run produced no text at all', () => {
+    const delivered = deliverableFinalReply(state({ terminal: 'done' }));
+    expect(delivered.kind).toBe('empty');
+    expect(delivered.body).toBe('');
+  });
+
   it('does not invent a notice when the run was interrupted', () => {
     const delivered = deliverableFinalReply(
       state({
