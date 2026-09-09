@@ -3,7 +3,6 @@ import type { CotMessagesMode, TenantBrand } from '../config/schema';
 import { log } from '../core/logger';
 import { toolHeaderText } from '../card/tool-render';
 import type { RunState } from '../card/run-state';
-import { selectFinalAnswerBlocks } from '../card/final-answer';
 
 const ENDPOINTS: Record<TenantBrand, string> = {
   feishu: 'https://open.feishu.cn',
@@ -253,7 +252,9 @@ export class CotPublisher {
 export function finalAnswerOnlyState(state: RunState): RunState {
   return {
     ...state,
-    blocks: selectFinalAnswerBlocks(state),
+    blocks: state.finalText
+      ? [{ kind: 'text', content: state.finalText, streaming: false }]
+      : state.blocks.filter((b) => b.kind === 'text'),
     reasoning: { content: '', active: false },
     footer: null,
   };

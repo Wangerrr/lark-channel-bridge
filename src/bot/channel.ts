@@ -75,7 +75,6 @@ import {
   CotPublisher,
   finalAnswerOnlyState,
 } from './cot';
-import { deliverableFinalReply } from '../card/final-answer';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -1455,19 +1454,11 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const delivered = deliverableFinalReply(input.state);
-  const state = delivered.state;
-  const body = delivered.body;
+  const body = renderText(input.state);
 
-  // Clean finish with only pre-tool progress ("先选几部…") used to post that
-  // opener as the whole reply. Prefer a notice over silence or a stub.
-  if (delivered.kind === 'notice') {
-    log.warn('outbound', 'empty-final-notice', {
-      scope: input.scope,
-      mode: input.replyMode,
-      chars: body.length,
-    });
-  }
+  // Nothing deliverable to send (agent produced no text on a clean finish;
+  // error/interrupt/timeout keep `body` non-empty via their notices). Skip
+  // rather than post an empty card that renders as "(no content)".
   if (!body.trim()) {
     log.info('outbound', 'skip-empty', { scope: input.scope, mode: input.replyMode });
     return;
@@ -1476,7 +1467,7 @@ async function sendFinalReply(input: {
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
       input.chatId,
-      { card: renderCard(state, input.cardRenderOptions) },
+      { card: renderCard(input.state, input.cardRenderOptions) },
       input.sendOpts,
     );
     requireMessageReceipt(result, 'card');

@@ -30,11 +30,6 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 - 需要某个 bot 接着处理时，必须真实 @ 它（open_id 优先从 \`bridge_context.mentions\` 里取）。除此之外**默认不要 @ 其他 bot**——互相 @ 会形成死循环；用户明确要求转交/通知某个 bot 时按要求执行。
 - 与其他 bot 对话时，没有新信息要补充就简短收尾，不要追问、不要客套往返。
 
-## final_reply
-
-给用户看的答案必须在工具都跑完之后再发。不要把「先…」「正在…」这种过程句当成终稿。
-如果还要发图，过程说明不够；没有最终正文时 bridge 不会把开场白发出去。
-
 ## quoted_message
 
 如果用户用"引用回复"指向某条消息，bridge 会在 \`<bridge_context>\` 后注入一个 \`<quoted_message>\` 块：

@@ -1,6 +1,6 @@
 {
   "name": "lark-channel-bridge-wg1",
-  "version": "0.7.1-wg1.0",
+  "version": "0.7.1-wg1.1",
   "description": "WG1 fork of lark-channel-bridge: Feishu/Lark messenger bridge for local CLI coding agents",
   "type": "module",
   "packageManager": "pnpm@10.33.0",

@@ -83,8 +83,6 @@ Default access is allowlist. Empty list means nobody except the app owner. Admin
 
 **Quoted image ignored** — you are probably still on Homebrew `lark-channel-bridge`. This fork should log `quote fetched` with `resources >= 1` and spawn with `images: 1`.
 
-**Reply is only a “先…” stub** — fixed on current `dev`. If it comes back, look for `outbound empty-final-notice`.
-
 **`self-signed certificate in certificate chain`** — run `start` once so the plist picks up `/etc/ssl/cert.pem`. Don’t hand-edit the plist and then overwrite it with `start`.
 
 ## Development

@@ -9,7 +9,6 @@
 ## 和上游不一样的地方
 
 - **引用图片会进模型。** 群里「发图 → 引用 → @bot」会把被引用消息的图下载下来，Codex/OpenCode 走 `--image`。手机只能这么 @，这条必须通。
-- **text 模式不再把过程句当终稿。** 「先选几部…再找海报」这种开场白不会再变成整轮回复。没有终稿时会明确说没有，而不是假装答完了。
 - **OpenCode** 可以作为 profile 的 agent。
 - launchd/systemd 会带上本机 TLS CA（`NODE_EXTRA_CA_CERTS` / `SSL_CERT_FILE`），公司证书链下飞书连得上。
 
@@ -84,9 +83,6 @@ macOS 服务名：`ai.lark-channel-bridge-wg1.bot.<profile>`。
 
 **引用了图却像没看见**  
 确认跑的是这份 WG1，不是 Homebrew `lark-channel-bridge`。看日志里有没有 `quote fetched` + `resources >= 1` + `images: 1`。
-
-**回了一句「先…」然后没了**  
-旧逻辑的锅，当前 `dev` 已修。若仍出现，看 `outbound empty-final-notice`。
 
 **公司网络 TLS 报 self-signed certificate**  
 `start` 一次，让 plist 带上 `/etc/ssl/cert.pem`。不要手改完再被 `start` 覆盖。
