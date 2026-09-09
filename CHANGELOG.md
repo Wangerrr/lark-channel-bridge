@@ -1,34 +1,14 @@
 # Changelog
 
-WG1 fork of `lark-channel-bridge@0.7.1`. Independent of upstream `zarazhangrui/lark-coding-agent-bridge`.
+WG1 fork of `lark-channel-bridge@0.7.1`.
 
 ## 0.7.1-wg1.0 — 2026-09-08
 
-### Fork / identity
+### 功能
 
-- Package and CLI renamed to `lark-channel-bridge-wg1` so it does not collide with Homebrew `lark-channel-bridge@0.7.1`.
-- Launchd / systemd service names are `lark-channel-bridge-wg1.bot.*`.
-- Config home remains `~/.lark-channel` (schema v2, compatible with 0.7.1). Set `LARK_CHANNEL_HOME` to isolate.
-- OpenCode adapter included (`--agent opencode`).
+- 适配 OpenCode，profile 可用 `--agent opencode`
 
-### Quoted inbound images
+### 修复
 
-- Reply-quotes now keep `resources` from the quoted message.
-- Quoted / topic-context images and files are downloaded before `media.resolve` and passed to Codex/OpenCode as `--image`.
-- Phone flow **send image → quote → @bot** works. Nested quote-chains are still one hop (the message being replied to).
-
-### Daemon TLS
-
-- Launchd (and systemd) forward `NODE_EXTRA_CA_CERTS` / `SSL_CERT_FILE` (and proxy env if set).
-- Defaults to `/etc/ssl/cert.pem` when present, so corporate MITM CAs do not break Feishu WS on macOS.
-
-### Final reply (text mode)
-
-- Do not treat pre-tool progress (`先…` / `正在…`) as the whole answer when `last_agent_message` is empty.
-- Prefer `finalText`, then text after the last tool.
-- If the run finished with only progress commentary, send a short notice instead of the stub, and log `outbound empty-final-notice`.
-
-### Not in this release
-
-- Native outbound image attach in `messageReply: text` (agent still uses `lark-cli` to post images).
-- Recursive quote-chain image walking.
+- 引用图片不进模型：被引用消息里的图会下载，并作为 `--image` 传给 Codex / OpenCode。手机上「发图 → 引用 → @bot」可用。
+- text 模式把过程句当终稿：像「先选几部…再找海报」这种开场白不再整段发出。没有最终回复时会明说没有，而不是假装答完。
