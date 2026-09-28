@@ -15,7 +15,8 @@ describe('README runtime contract', () => {
       'pnpm test',
       'pnpm typecheck',
       'pnpm build',
-      'git checkout dev',
+      'git clone git@github.com:Wangerrr/lark-channel-bridge.git',
+      'pnpm install',
       '~/.lark-channel',
     ]) {
       expect(docs).toContain(phrase);

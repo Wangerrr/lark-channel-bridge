@@ -14,6 +14,7 @@ import {
   type AgentKind,
   type CodexConfig,
   type OpenCodeConfig,
+  type GrokConfig,
   type RootConfig,
 } from './profile-schema';
 import { markPermissionDefaultsMigration, saveRootConfig } from './profile-store';
@@ -29,6 +30,7 @@ export interface MigrateV2Options {
   agentKind?: AgentKind;
   codex?: CodexConfig;
   opencode?: OpenCodeConfig;
+  grok?: GrokConfig;
 }
 
 export interface MigrateV2Result {
@@ -132,6 +134,7 @@ export async function migrateV1ToV2(opts: MigrateV2Options = {}): Promise<Migrat
     },
     ...(agentKind === 'codex' && opts.codex ? { codex: opts.codex } : {}),
     ...(agentKind === 'opencode' && opts.opencode ? { opencode: opts.opencode } : {}),
+    ...(agentKind === 'grok' && opts.grok ? { grok: opts.grok } : {}),
   });
   if (legacyDefaultWorkspace) {
     profileConfig.workspaces = {
@@ -203,7 +206,7 @@ function activeProcessFromRegistryEntry(entry: RegistryEntry): ActiveBridgeMigra
   if (typeof entry.appId === 'string') active.appId = entry.appId;
   if (typeof entry.tenant === 'string') active.tenant = entry.tenant;
   if (typeof entry.profileName === 'string') active.profileName = entry.profileName;
-  if (entry.agentKind === 'claude' || entry.agentKind === 'codex' || entry.agentKind === 'opencode') active.agentKind = entry.agentKind;
+  if (entry.agentKind === 'claude' || entry.agentKind === 'codex' || entry.agentKind === 'opencode' || entry.agentKind === 'grok') active.agentKind = entry.agentKind;
   if (typeof entry.configPath === 'string') active.configPath = entry.configPath;
   if (typeof entry.startedAt === 'string') active.startedAt = entry.startedAt;
   if (typeof entry.version === 'string') active.version = entry.version;

@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute } from 'node:path';
 import type { LarkChannel, NormalizedMessage } from '@larksuite/channel';
-import { capabilityForProfile, type AgentCapabilityId } from '../agent/capability';
-import { DEFAULT_MODEL, normalizeModelSelection, supportedModels } from '../agent/models';
+import { capabilityForProfile, resumesWithSessionId, type AgentCapabilityId } from '../agent/capability';
+import { acceptsFreeformModel, DEFAULT_MODEL, normalizeModelSelection, supportedModels } from '../agent/models';
 import type { AgentAdapter } from '../agent/types';
 import type { ActiveRuns } from '../bot/active-runs';
 import {
@@ -592,15 +592,16 @@ async function handleResume(args: string, ctx: CommandContext): Promise<void> {
     return;
   }
 
-  if (ctx.controls.profileConfig.agentKind === 'opencode') {
+  if (ctx.controls.profileConfig.agentKind === 'opencode' || ctx.controls.profileConfig.agentKind === 'grok') {
     const identity = ctx.sessionCatalogIdentity;
     const entry = identity && ctx.sessionCatalog ? ctx.sessionCatalog.activeFor(identity) : undefined;
+    const label = ctx.controls.profileConfig.agentKind === 'grok' ? 'Grok' : 'OpenCode';
     const entries = entry?.sessionId && identity
       ? [{
           sessionId: issueResumeCandidate(identity, { sessionId: entry.sessionId }),
-          preview: '当前 OpenCode session',
+          preview: `当前 ${label} session`,
           relTime: formatRelTime(entry.updatedAt),
-          detail: `OpenCode · ${entry.sessionId}`,
+          detail: `${label} · ${entry.sessionId}`,
           current: true,
         }]
       : [];
@@ -662,7 +663,7 @@ async function applyResume(sessionId: string, ctx: CommandContext): Promise<void
       return;
     }
     ctx.activeRuns.interrupt(ctx.scope);
-    if (ctx.sessionCatalogIdentity.agentId === 'claude' || ctx.sessionCatalogIdentity.agentId === 'opencode') {
+    if (resumesWithSessionId(ctx.sessionCatalogIdentity.agentId)) {
       ctx.sessions.set(ctx.scope, sessionId, ctx.sessionCatalogIdentity.cwdRealpath);
     }
     await reply(ctx, RESUME_APPLIED_REPLY);
@@ -715,7 +716,7 @@ function consumeResumeCandidate(
     candidate.agentId !== identity.agentId ||
     candidate.cwdRealpath !== identity.cwdRealpath ||
     candidate.policyFingerprint !== identity.policyFingerprint ||
-    ((identity.agentId === 'claude' || identity.agentId === 'opencode') && !candidate.sessionId) ||
+    (resumesWithSessionId(identity.agentId) && !candidate.sessionId) ||
     (identity.agentId === 'codex' && !candidate.threadId)
   ) {
     return undefined;
@@ -778,7 +779,7 @@ function selectedResumeCwd(ctx: CommandContext): string | undefined {
 function runtimeAccessStatus(
   profileConfig: ProfileConfig,
 ): { label: string; value: string } {
-  if (profileConfig.agentKind === 'claude') {
+  if (profileConfig.agentKind === 'claude' || profileConfig.agentKind === 'grok') {
     return {
       label: 'permission',
       value: accessToClaudePermissionMode(
@@ -829,17 +830,17 @@ async function handleStatus(_args: string, ctx: CommandContext): Promise<void> {
   const cwd = effectiveWorkspaceCwd(ctx);
   const sess = ctx.sessions.getRaw(ctx.scope);
   const isCodex = ctx.controls.profileConfig.agentKind === 'codex';
-  const isOpenCode = ctx.controls.profileConfig.agentKind === 'opencode';
+  const isCatalogSession = ctx.controls.profileConfig.agentKind === 'opencode' || ctx.controls.profileConfig.agentKind === 'grok';
   const catalogEntry =
-    (isCodex || isOpenCode) && ctx.sessionCatalog && ctx.sessionCatalogIdentity
+    (isCodex || isCatalogSession) && ctx.sessionCatalog && ctx.sessionCatalogIdentity
       ? ctx.sessionCatalog.activeFor(ctx.sessionCatalogIdentity)
       : undefined;
   const card = statusCard({
     profileName: ctx.controls.profile,
     cwd,
-    sessionId: isCodex ? catalogEntry?.threadId : isOpenCode ? catalogEntry?.sessionId : sess?.sessionId,
-    emptySessionText: isCodex || isOpenCode ? '(未建立)' : undefined,
-    sessionStale: !isCodex && !isOpenCode && Boolean(cwd && sess && sess.cwd !== cwd),
+    sessionId: isCodex ? catalogEntry?.threadId : isCatalogSession ? catalogEntry?.sessionId : sess?.sessionId,
+    emptySessionText: isCodex || isCatalogSession ? '(未建立)' : undefined,
+    sessionStale: !isCodex && !isCatalogSession && Boolean(cwd && sess && sess.cwd !== cwd),
     agentName: ctx.agent.displayName,
     runtimeAccess: runtimeAccessStatus(ctx.controls.profileConfig),
     larkCliStatus: await larkCliStatus(ctx),
@@ -1817,7 +1818,7 @@ async function submitConfig(ctx: CommandContext): Promise<void> {
   // tidy (resolveModelArg treats both the same way).
   const agentKind = ctx.controls.profileConfig.agentKind;
   const rawModel = String(fv.model ?? '').trim();
-  const modelValid = rawModel !== '' && (agentKind === 'opencode' || supportedModels(agentKind).some((m) => m.value === rawModel));
+  const modelValid = rawModel !== '' && (acceptsFreeformModel(agentKind) || supportedModels(agentKind).some((m) => m.value === rawModel));
   const modelSelection = modelValid
     ? rawModel
     : normalizeModelSelection(agentKind, ctx.controls.cfg.preferences?.model);

@@ -97,6 +97,7 @@
     "claude-code",
     "codex",
     "opencode",
+    "grok",
     "cli",
     "channel",
     "bridge"

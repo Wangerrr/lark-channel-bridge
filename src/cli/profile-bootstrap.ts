@@ -15,6 +15,7 @@ export interface BootstrapProfileInput {
   defaultWorkspace?: string;
   codexBinaryPath?: string;
   opencodeBinaryPath?: string;
+  grokBinaryPath?: string;
   profileDir?: string;
 }
 
@@ -34,6 +35,10 @@ export async function createBootstrapProfileConfig(
     input.agentKind === 'opencode'
       ? await createBootstrapOpenCodeConfig(input.opencodeBinaryPath)
       : undefined;
+  const grok =
+    input.agentKind === 'grok'
+      ? await createBootstrapGrokConfig(input.grokBinaryPath)
+      : undefined;
   const profile = createDefaultProfileConfig({
     agentKind: input.agentKind,
     accounts: input.accounts,
@@ -41,6 +46,7 @@ export async function createBootstrapProfileConfig(
     secrets: input.secrets,
     ...(codex ? { codex } : {}),
     ...(opencode ? { opencode } : {}),
+    ...(grok ? { grok } : {}),
   });
   if (workspace) {
     profile.workspaces = {
@@ -55,7 +61,22 @@ export async function createBootstrapProfileConfig(
 }
 
 export async function createBootstrapOpenCodeConfig(binaryPath: string | undefined) {
-  const command = binaryPath ?? process.env.LARK_CHANNEL_OPENCODE_BIN ?? 'opencode';
+  return createBootstrapBinaryConfig(binaryPath, {
+    env: 'LARK_CHANNEL_OPENCODE_BIN', fallback: 'opencode', agentId: 'opencode', agentName: 'OpenCode',
+  });
+}
+
+export async function createBootstrapGrokConfig(binaryPath: string | undefined) {
+  return createBootstrapBinaryConfig(binaryPath, {
+    env: 'LARK_CHANNEL_GROK_BIN', fallback: 'grok', agentId: 'grok', agentName: 'Grok Build',
+  });
+}
+
+async function createBootstrapBinaryConfig(
+  binaryPath: string | undefined,
+  spec: { env: string; fallback: string; agentId: 'opencode' | 'grok'; agentName: string },
+) {
+  const command = binaryPath ?? process.env[spec.env] ?? spec.fallback;
   let resolvedBinary: string;
   try {
     resolvedBinary = await resolveExecutablePath(command);
@@ -63,7 +84,7 @@ export async function createBootstrapOpenCodeConfig(binaryPath: string | undefin
     const errno = (err as NodeJS.ErrnoException).code;
     throw new AgentPreflightError({
       code: errno === 'EACCES' || errno === 'EPERM' ? 'agent-binary-not-executable' : 'agent-binary-not-found',
-      agentId: 'opencode', agentName: 'OpenCode', command, binaryPath: command, errno,
+      agentId: spec.agentId, agentName: spec.agentName, command, binaryPath: command, errno,
     });
   }
   return { binaryPath: resolvedBinary };

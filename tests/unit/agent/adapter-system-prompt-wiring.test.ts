@@ -18,6 +18,7 @@ import {
 } from '../../../src/agent/bridge-system-prompt';
 import { ClaudeAdapter } from '../../../src/agent/claude/adapter';
 import { CodexAdapter } from '../../../src/agent/codex/adapter';
+import { GrokAdapter } from '../../../src/agent/grok/adapter';
 import { OpenCodeAdapter } from '../../../src/agent/opencode/adapter';
 
 interface FakeChild extends EventEmitter {
@@ -132,6 +133,60 @@ describe('OpenCodeAdapter system prompt wiring', () => {
   });
 });
 
+
+describe('OpenCodeAdapter workspace permissions', () => {
+  it('allows edits and denies shell for acceptEdits without --auto', () => {
+    const child = fakeChild();
+    spawnMock.spawnProcess.mockReturnValue(child);
+    const adapter = new OpenCodeAdapter({ binary: '/usr/local/bin/opencode' });
+
+    adapter.run({ runId: 'r1', prompt: 'hi', cwd: '/tmp', permissionMode: 'acceptEdits' });
+
+    const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
+    const env = spawnMock.spawnProcess.mock.calls[0]?.[2]?.env as Record<string, string>;
+    expect(args).not.toContain('--auto');
+    const permission = env.OPENCODE_PERMISSION;
+    expect(permission).toEqual(expect.any(String));
+    expect(JSON.parse(permission ?? '')).toMatchObject({ edit: 'allow', bash: 'deny' });
+  });
+});
+
+describe('GrokAdapter headless wiring', () => {
+  it('sends the bridge prompt via --prompt-file and resumes with --resume', async () => {
+    const child = fakeChild();
+    spawnMock.spawnProcess.mockReturnValue(child);
+    const adapter = new GrokAdapter({ binary: '/usr/local/bin/grok' });
+    adapter.setBotIdentity({ openId: 'ou_bot', name: 'Bridge' });
+    const prompt = 'user message with XML <bridge_context>';
+
+    adapter.run({
+      runId: 'r1',
+      prompt,
+      cwd: '/tmp/workspace',
+      sessionId: 'ses_grok',
+      permissionMode: 'bypassPermissions',
+      model: 'grok-4',
+    });
+
+    const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
+    expect(args).toContain('--output-format');
+    expect(args).toContain('streaming-messages-json');
+    expect(args).toContain('--verbatim');
+    expect(args).toContain('--resume');
+    expect(args).toContain('ses_grok');
+    expect(args).toContain('--permission-mode');
+    expect(args).toContain('bypassPermissions');
+    expect(args).toContain('--model');
+    expect(args).toContain('grok-4');
+    expect(args.join('\n')).not.toContain(prompt);
+    const fileIndex = args.indexOf('--prompt-file');
+    expect(fileIndex).toBeGreaterThan(-1);
+    expect(readFileSync(args[fileIndex + 1]!, 'utf8')).toBe(
+      prefixBridgeSystemPrompt(prompt, { openId: 'ou_bot', name: 'Bridge' }),
+    );
+    expect(await readAll(child.stdin)).toBe('');
+  });
+});
 async function readAll(stream: PassThrough): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {

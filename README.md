@@ -1,56 +1,52 @@
 # lark-channel-bridge-wg1
 
-Bridge Feishu / Lark chat to a local Claude Code, Codex, or OpenCode process. DM the bot or `@bot` in a group; the agent runs on your machine and replies in chat.
+`lark-channel-bridge-wg1` connects a Feishu or Lark conversation to a coding agent running on the host. Direct messages, and group messages that mention the bot, are executed locally. The agent's reply is posted back to the same chat.
 
-This is an independently maintained fork of `lark-channel-bridge@0.7.1`. It is **not** a ByteDance / Feishu product and is not affiliated with upstream `zarazhangrui/lark-coding-agent-bridge`. The CLI is `lark-channel-bridge-wg1` so it does not collide with the Homebrew package.
+This repository is an independently maintained fork of `lark-channel-bridge` 0.7.1. It is not a ByteDance or Feishu product, and it is not affiliated with the upstream project [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge). The command is named `lark-channel-bridge-wg1` so that it does not conflict with the Homebrew package of the upstream project.
 
 [中文](./README.zh.md) · [Changelog](./CHANGELOG.md)
 
-## What this fork changes
+## Capabilities
 
-- **Quoted images reach the model.** In a group, send an image, quote it, then `@bot`. The quoted message’s files are downloaded and passed to Codex/OpenCode as `--image`. That is the only way to @ the bot with a picture on mobile.
-- **Text mode does not treat progress as the answer.** Openers like “先选几部…再找海报” are not posted as the whole reply. If there is no final message, the bridge says so instead of faking completion.
-- **OpenCode** can be a profile agent.
-- Launchd / systemd inherit TLS CA env (`NODE_EXTRA_CA_CERTS` / `SSL_CERT_FILE`) so Feishu still connects behind corporate MITM CAs.
+The fork retains the 0.7.1 configuration layout and adds the following.
 
-Config stays in `~/.lark-channel` (schema v2, compatible with 0.7.1). Do **not** run this and official 0.7.1 against the same profile at the same time.
+- **Quoted images.** In a group, send an image, quote that message, then mention the bot. The bridge downloads the quoted message's files, writes each local path into the quoted block, and removes the Feishu file key so the agent does not try to fetch it. Codex also receives the image on `--image`. OpenCode receives it on `--file`; in local mode that flag attaches the file as text, not as vision input. Claude and Grok read the local path. On mobile, quoting the image is the only way to mention the bot together with a picture.
+- **Additional agents.** A profile may use Claude Code, Codex, OpenCode (`--agent opencode`), or Grok Build (`--agent grok`).
+- **Corporate TLS.** launchd and systemd units inherit `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`, so the Feishu connection can use a corporate certificate authority.
 
-## Still not done
+Configuration remains in `~/.lark-channel` (schema version 2, compatible with 0.7.1). Do not run this fork and the upstream 0.7.1 package against the same profile at the same time.
 
-- The official text-mode reply **cannot attach images**. If the agent wants pictures in the group, it still has to call `lark-cli` itself.
-- Quote handling is one hop: only the message being replied to, not a full A→B→C chain.
-- Not published to npm. Build from this repo.
+## Requirements
 
-## Prerequisites
+- Node.js 20.12.0 or newer
+- One installed and authenticated agent: `claude`, `codex`, `opencode`, or `grok`
+- A Feishu or Lark PersonalAgent application. The first `run` can create one with the QR wizard, or an existing application can be supplied with `--app-id`
 
-- Node.js >= 20.12.0
-- At least one of `claude`, `codex`, or `opencode` installed and logged in
-- A Feishu / Lark PersonalAgent app (QR wizard on first `run`, or pass `--app-id`)
+Grok Build must be signed in (`grok login`) or provided with `XAI_API_KEY`. A non-default binary may be selected with `LARK_CHANNEL_GROK_BIN` or `LARK_CHANNEL_OPENCODE_BIN`.
 
-## Run from source
+## Install and run
 
 ```bash
 git clone git@github.com:Wangerrr/lark-channel-bridge.git
 cd lark-channel-bridge
-git checkout dev
 pnpm install
 pnpm build
 ./bin/lark-channel-bridge-wg1.mjs run --profile codex
 ```
 
-First run writes `~/.lark-channel/config.json`. Switch the working directory later with `/cd <path>` in chat.
+The first run writes `~/.lark-channel/config.json`. Change the working directory later from chat with `/cd <path>`.
 
-Existing app:
+An existing application:
 
 ```bash
 ./bin/lark-channel-bridge-wg1.mjs run --profile <name> --agent codex --app-id cli_xxx
 ```
 
-For Lark (international) add `--tenant lark`.
+For Lark (international), add `--tenant lark`. Create a Grok profile with `--agent grok`, or an OpenCode profile with `--agent opencode`.
 
-## Background service
+## Service
 
-After a foreground `run` works, Ctrl-C, then:
+After a foreground `run` succeeds, stop it and install the platform service:
 
 ```bash
 ./bin/lark-channel-bridge-wg1.mjs start --profile codex
@@ -58,32 +54,37 @@ After a foreground `run` works, Ctrl-C, then:
 ./bin/lark-channel-bridge-wg1.mjs stop --profile codex
 ```
 
-macOS label: `ai.lark-channel-bridge-wg1.bot.<profile>`.  
-Logs: `~/.lark-channel/profiles/<profile>/logs/` (daemon stdout/stderr under `logs/daemon/`).
+On macOS the launchd label is `ai.lark-channel-bridge-wg1.bot.<profile>`. Logs are written to `~/.lark-channel/profiles/<profile>/logs/`, with daemon stdout and stderr under `logs/daemon/`.
 
-One OS service per profile. Two processes must not share a profile.
+Each profile has its own service. Two processes must not share a profile.
 
-## Chat usage
+## Chat
 
-| | |
+| Action | Command |
 |---|---|
-| DM | just send |
-| Group | `@bot` by default |
-| Images | send to the bot, or **quote the image then @** |
-| Stop | `/stop` |
-| New session | `/new` |
-| cwd | `/cd /path/to/project` |
-| Access | `/invite user @them`, `/invite group` in a group |
+| Direct message | Send the message. A mention is not required. |
+| Group message | Mention the bot. This is the default. |
+| Image | Send it to the bot, or quote the image and then mention the bot. |
+| Stop the current run | `/stop` |
+| Start a new session | `/new` |
+| Change the working directory | `/cd /path/to/project` |
+| Grant access | `/invite user @name`, or `/invite group` in a group |
 
-Default access is allowlist. Empty list means nobody except the app owner. Admins bypass the group list.
+Access is allowlist-based. An empty list admits nobody except the application owner. Group administrators are not subject to the group allowlist.
+
+## Limitations
+
+- A text-mode reply cannot attach images. If the agent needs to post a picture, it must call `lark-cli` itself.
+- Quote handling covers the message being replied to, not an A→B→C chain of quotes.
+- The package is not published to npm. Build it from this repository.
 
 ## Troubleshooting
 
-**No replies** — local CLI not logged in, or cwd missing. Send `/status`.
+**The bot does not reply.** The local agent is not authenticated, or the working directory does not exist. Send `/status`.
 
-**Quoted image ignored** — you are probably still on Homebrew `lark-channel-bridge`. This fork should log `quote fetched` with `resources >= 1` and spawn with `images: 1`.
+**A quoted image is ignored.** Confirm that this fork is running, not the Homebrew package `lark-channel-bridge`. The log should contain `quote fetched` with `resources >= 1`. Codex and OpenCode runs should also show the image path in the spawn arguments.
 
-**`self-signed certificate in certificate chain`** — run `start` once so the plist picks up `/etc/ssl/cert.pem`. Don’t hand-edit the plist and then overwrite it with `start`.
+**`self-signed certificate in certificate chain`.** Run `start` so the service definition picks up `/etc/ssl/cert.pem`. Do not edit the plist by hand and then overwrite it with `start`.
 
 ## Development
 
@@ -93,7 +94,7 @@ pnpm typecheck
 pnpm build
 ```
 
-CI runs that on macOS, Ubuntu, and Windows with a frozen lockfile. No telemetry unless you opt in.
+Continuous integration runs those three commands on macOS, Ubuntu, and Windows, after `pnpm install --frozen-lockfile`. Telemetry is disabled unless explicitly enabled.
 
 ## License
 

@@ -609,5 +609,7 @@ function agentDisplay(agentKind: ProcessEntry['agentKind']): { id: string; displ
     ? { id: 'codex', displayName: 'Codex CLI' }
     : agentKind === 'opencode'
       ? { id: 'opencode', displayName: 'OpenCode' }
-      : { id: 'claude', displayName: 'Claude Code' };
+      : agentKind === 'grok'
+        ? { id: 'grok', displayName: 'Grok Build' }
+        : { id: 'claude', displayName: 'Claude Code' };
 }

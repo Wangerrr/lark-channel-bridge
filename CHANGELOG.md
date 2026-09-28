@@ -2,6 +2,18 @@
 
 WG1 fork of `lark-channel-bridge@0.7.1`.
 
+## Unreleased
+
+### 功能
+
+- 适配 Grok Build，profile 可用 `--agent grok`。headless 走 `--prompt-file` 和 `streaming-messages-json`，会话用 `--resume`。
+
+### 修复
+
+- OpenCode 失败原因读 `error.data.message`，不再一律显示 `OpenCode run failed`。
+- OpenCode 的 workspace（`acceptEdits`）允许读和改文件，并拒绝 shell。之前不传 `--auto`，headless 会把工具权限直接拒绝。
+- 引用图片：引用块和话题上下文写上已下载的本地路径，并去掉飞书 file key。
+
 ## 0.7.1-wg1.1 — 2026-09-09
 
 ### 回退

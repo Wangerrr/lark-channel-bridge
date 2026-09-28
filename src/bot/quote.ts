@@ -281,3 +281,42 @@ export function renderQuotedBlock(quotes: QuotedContext[]): string {
   });
   return parts.join('\n');
 }
+
+/**
+ * Quoted bodies still contain Feishu file keys (`![image](img_v3_...)`).
+ * The downloaded file lives on a local path, correlated only by
+ * `sourceMessageId` in the attachment list. Put the path on the quote itself
+ * and drop the key so the model does not try to fetch it.
+ */
+export function annotateQuotedContent(
+  quote: Pick<QuotedContext, 'content' | 'resources'>,
+  localFiles: ReadonlyArray<{ kind: string; path: string }>,
+): string {
+  let content = quote.content;
+  for (const resource of quote.resources) {
+    if (!resource.fileKey) continue;
+    content = stripResourceKey(content, resource.fileKey);
+  }
+  content = content.replace(/\n{3,}/g, '\n\n').trim();
+  if (localFiles.length === 0) {
+    if (quote.resources.length === 0) return content;
+    return [content, '引用里的文件没有下载成功，不要请求飞书 file key。'].filter(Boolean).join('\n');
+  }
+  const lines = localFiles.map((file) => `[local ${file.kind}] ${file.path}`);
+  return [content, '已下载到本地，请读取这些路径，不要请求飞书 file key：', ...lines]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function stripResourceKey(text: string, fileKey: string): string {
+  const escaped = fileKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text
+    .replace(new RegExp(`!?\\[[^\\]]*\\]\\(${escaped}\\)`, 'g'), '')
+    .replace(
+      new RegExp(
+        `<\\s*(?:file|image|img|audio|video|media|folder)\\b[^>]*\\bkey\\s*=\\s*["']${escaped}["'][^>]*>`,
+        'gi',
+      ),
+      '',
+    );
+}

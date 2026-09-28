@@ -62,7 +62,10 @@ export class OpenCodeAdapter implements AgentAdapter {
     for (const image of opts.images ?? []) args.push('--file', image);
     const child = spawnProcess(this.binary, args, {
       cwd: opts.cwd,
-      env: mergeProcessEnv(process.env, buildLarkChannelEnv(this.larkChannel)),
+      env: mergeProcessEnv(process.env, {
+        ...buildLarkChannelEnv(this.larkChannel),
+        ...opencodePermissionEnv(opts.permissionMode),
+      }),
       // OpenCode accepts the prompt from stdin when no positional message is
       // supplied. This is important on Windows: npm-installed `opencode.cmd`
       // shims route argv through cmd.exe, which can truncate or reinterpret a
@@ -207,7 +210,38 @@ function recordValue(value: unknown): Record<string, unknown> | undefined { retu
 function stringValue(value: unknown): string | undefined { return typeof value === 'string' ? value : undefined; }
 function errorMessage(raw: Record<string, unknown>): string {
   const error = recordValue(raw.error);
-  return stringValue(raw.message) ?? stringValue(error?.message) ?? stringValue(raw.error) ?? 'OpenCode run failed';
+  const data = recordValue(error?.data);
+  // `opencode run --format json` forwards the raw error object. The readable
+  // string is `error.data.message`, not `error.message`.
+  return stringValue(raw.message)
+    ?? stringValue(data?.message)
+    ?? stringValue(error?.message)
+    ?? stringValue(raw.error)
+    ?? 'OpenCode run failed';
+}
+
+/**
+ * Headless `opencode run` rejects any permission that would prompt, unless
+ * `--auto` is set. `--auto` approves everything that is not explicitly denied,
+ * which is only appropriate for full access. Workspace (`acceptEdits`) instead
+ * allows read/edit and denies shell for this process only. `OPENCODE_PERMISSION`
+ * deep-merges over the user's config, so the bridge policy wins for this run.
+ */
+function opencodePermissionEnv(mode: AgentRunOptions['permissionMode']): NodeJS.ProcessEnv {
+  if (mode !== 'acceptEdits') return {};
+  return {
+    OPENCODE_PERMISSION: JSON.stringify({
+      read: 'allow',
+      edit: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      webfetch: 'allow',
+      websearch: 'allow',
+      bash: 'deny',
+      task: 'deny',
+      external_directory: 'deny',
+    }),
+  };
 }
 async function waitForExitCode(child: OpenCodeChild): Promise<number | null> {
   if (child.exitCode !== null || child.signalCode !== null) return child.exitCode;

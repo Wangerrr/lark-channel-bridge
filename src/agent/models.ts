@@ -47,10 +47,25 @@ const OPENCODE_MODELS: ModelOption[] = [
   { value: DEFAULT_MODEL, label: '跟随 OpenCode 配置（不指定）' },
 ];
 
+const GROK_MODELS: ModelOption[] = [
+  { value: DEFAULT_MODEL, label: '跟随 Grok 配置（不指定）' },
+];
+
+/** OpenCode and Grok take a free-form provider model id, not a fixed picker list. */
+export function acceptsFreeformModel(agentKind: AgentKind): boolean {
+  return agentKind === 'opencode' || agentKind === 'grok';
+}
+
 /** The model picker options for a profile's agent kind. */
 export function supportedModels(agentKind: AgentKind, selected?: string): ModelOption[] {
-  const base = agentKind === 'codex' ? CODEX_MODELS : agentKind === 'opencode' ? OPENCODE_MODELS : CLAUDE_MODELS;
-  if (agentKind === 'opencode' && selected && selected !== DEFAULT_MODEL && !base.some((m) => m.value === selected)) {
+  const base = agentKind === 'codex'
+    ? CODEX_MODELS
+    : agentKind === 'opencode'
+      ? OPENCODE_MODELS
+      : agentKind === 'grok'
+        ? GROK_MODELS
+        : CLAUDE_MODELS;
+  if (acceptsFreeformModel(agentKind) && selected && selected !== DEFAULT_MODEL && !base.some((m) => m.value === selected)) {
     return [...base, { value: selected, label: `当前配置（${selected}）` }];
   }
   return base;
@@ -73,7 +88,7 @@ export function normalizeModelSelection(
   value: string | undefined,
 ): string {
   if (isDefaultModel(value)) return DEFAULT_MODEL;
-  if (agentKind === 'opencode') return value?.trim() || DEFAULT_MODEL;
+  if (acceptsFreeformModel(agentKind)) return value?.trim() || DEFAULT_MODEL;
   return supportedModels(agentKind).some((m) => m.value === value)
     ? (value as string)
     : DEFAULT_MODEL;

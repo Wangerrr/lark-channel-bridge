@@ -29,4 +29,13 @@ describe('OpenCode JSON translator', () => {
     expect(translator.translate({ type: 'text', sessionID: 'ses_test', part: { id: 'p1', text: 'hel' } })).toContainEqual({ type: 'text', delta: 'hel' });
     expect(translator.translate({ type: 'text', sessionID: 'ses_test', part: { id: 'p1', text: 'hello' } })).toEqual([{ type: 'text', delta: 'lo' }]);
   });
+
+  it('reads the message from error.data.message', () => {
+    const translator = new OpenCodeJsonTranslator();
+    expect(translator.translate({
+      type: 'error',
+      sessionID: 'ses_test',
+      error: { name: 'UnknownError', data: { message: 'model not found' } },
+    })).toContainEqual({ type: 'error', message: 'model not found', terminationReason: 'failed' });
+  });
 });

@@ -64,7 +64,7 @@ import { commandSessionCatalogIdentity } from './session-catalog-identity';
 import { startKeepalive } from './keepalive';
 import { PendingQueue } from './pending-queue';
 import { ProcessPool } from './process-pool';
-import { fetchQuotedContext, fetchTopicContext, type QuotedContext } from './quote';
+import { annotateQuotedContent, fetchQuotedContext, fetchTopicContext, type QuotedContext } from './quote';
 import { lookupMessageThreadId } from './thread-id';
 import { addWorkingReaction, removeReaction } from './reaction';
 import { fetchKnownChats } from './lark-info';
@@ -1855,8 +1855,8 @@ function buildPrompt(
         ? [...BRIDGE_AGENT_INSTRUCTIONS, ...extraInstructions]
         : BRIDGE_AGENT_INSTRUCTIONS,
     userInput: userPart,
-    ...(topicContext.length > 0 ? { topicContext: topicContext.map(toPromptTopicMessage) } : {}),
-    quotedMessages: quotes.map(toPromptQuote),
+    ...(topicContext.length > 0 ? { topicContext: topicContext.map((q) => toPromptTopicMessage(q, attachments)) } : {}),
+    quotedMessages: quotes.map((q) => toPromptQuote(q, attachments)),
     interactiveCards: batch.map(toPromptInteractiveCard).filter(isDefined),
     attachments: attachments.map(toPromptAttachment),
   });
@@ -1948,18 +1948,18 @@ function stripAttachmentRefs(text: string, fileKeys: string[]): string {
   return out.replace(/\n{3,}/g, '\n\n');
 }
 
-function toPromptQuote(q: QuotedContext): BridgePromptQuotedMessage {
+function toPromptQuote(q: QuotedContext, attachments: LocalAttachment[]): BridgePromptQuotedMessage {
   return {
     messageId: q.messageId,
     senderId: q.senderId,
     ...(q.senderName ? { senderName: q.senderName } : {}),
     ...(q.createdAt ? { createdAt: q.createdAt } : {}),
     rawContentType: q.rawContentType,
-    content: q.content,
+    content: quotedContentForPrompt(q, attachments),
   };
 }
 
-function toPromptTopicMessage(q: QuotedContext): BridgePromptTopicMessage {
+function toPromptTopicMessage(q: QuotedContext, attachments: LocalAttachment[]): BridgePromptTopicMessage {
   return {
     messageId: q.messageId,
     senderId: q.senderId,
@@ -1967,8 +1967,17 @@ function toPromptTopicMessage(q: QuotedContext): BridgePromptTopicMessage {
     ...(q.senderType ? { senderType: q.senderType } : {}),
     ...(q.createdAt ? { createdAt: q.createdAt } : {}),
     rawContentType: q.rawContentType,
-    content: q.content,
+    content: quotedContentForPrompt(q, attachments),
   };
+}
+
+function quotedContentForPrompt(q: QuotedContext, attachments: LocalAttachment[]): string {
+  return annotateQuotedContent(
+    q,
+    attachments
+      .filter((attachment) => attachment.sourceMessageId === q.messageId && attachment.decision === 'accepted')
+      .map((attachment) => ({ kind: attachment.kind, path: attachment.absPath })),
+  );
 }
 
 function toPromptInteractiveCard(m: NormalizedMessage): BridgePromptInteractiveCard | undefined {

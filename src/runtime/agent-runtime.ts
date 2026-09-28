@@ -1,5 +1,6 @@
 import { ClaudeAdapter } from '../agent/claude/adapter';
 import { CodexAdapter } from '../agent/codex/adapter';
+import { GrokAdapter } from '../agent/grok/adapter';
 import { OpenCodeAdapter } from '../agent/opencode/adapter';
 import { AgentPreflightError, type AgentAvailability } from '../agent/preflight';
 import type { AgentAdapter } from '../agent/types';
@@ -55,6 +56,11 @@ export function createRuntimeAgent(
     if (!opencode?.binaryPath) throw new Error('opencode profile requires opencode.binaryPath');
     return new OpenCodeAdapter({ binary: opencode.binaryPath, larkChannel });
   }
+  if (profileConfig.agentKind === 'grok') {
+    const grok = profileConfig.grok;
+    if (!grok?.binaryPath) throw new Error('grok profile requires grok.binaryPath');
+    return new GrokAdapter({ binary: grok.binaryPath, larkChannel });
+  }
   return new ClaudeAdapter({ larkChannel });
 }
 
@@ -65,9 +71,12 @@ export async function checkRuntimeAgentAvailability(agent: AgentAdapter): Promis
   const diagnostic = {
     code: 'agent-binary-not-found' as const,
     agentId:
-      agent.id === 'codex' ? ('codex' as const) : agent.id === 'opencode' ? ('opencode' as const) : ('claude' as const),
+      agent.id === 'codex' ? ('codex' as const)
+      : agent.id === 'opencode' ? ('opencode' as const)
+      : agent.id === 'grok' ? ('grok' as const)
+      : ('claude' as const),
     agentName: agent.displayName,
-    command: agent.id === 'codex' ? 'codex' : agent.id === 'opencode' ? 'opencode' : 'claude',
+    command: agent.id === 'codex' ? 'codex' : agent.id === 'opencode' ? 'opencode' : agent.id === 'grok' ? 'grok' : 'claude',
   };
   return { ok: false, diagnostic, error: new AgentPreflightError(diagnostic) };
 }

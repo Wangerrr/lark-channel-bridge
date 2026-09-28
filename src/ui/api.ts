@@ -41,7 +41,7 @@ import {
   type ProfileAccess,
   type ProfileMode,
 } from '../config/profile-schema';
-import { DEFAULT_MODEL, normalizeModelSelection, supportedModels } from '../agent/models';
+import { acceptsFreeformModel, DEFAULT_MODEL, normalizeModelSelection, supportedModels } from '../agent/models';
 import { log } from '../core/logger';
 import { HttpError } from './http';
 import type { UiRuntime } from './types';
@@ -213,7 +213,7 @@ function parseConfigBody(state: MutableProfileState, body: unknown): ParsedConfi
       : state.profileConfig.larkCli.identityPreset;
 
   const rawModel = typeof fv.model === 'string' ? fv.model : '';
-  const modelValid = rawModel !== '' && (agentKind === 'opencode' || supportedModels(agentKind).some((m) => m.value === rawModel));
+  const modelValid = rawModel !== '' && (acceptsFreeformModel(agentKind) || supportedModels(agentKind).some((m) => m.value === rawModel));
   const modelSelection = modelValid
     ? rawModel
     : normalizeModelSelection(agentKind, state.cfg.preferences?.model);

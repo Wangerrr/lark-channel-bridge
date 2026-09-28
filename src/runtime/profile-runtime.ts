@@ -94,6 +94,9 @@ export function createRuntimeProfileConfig(
     ...(input.agentKind === 'opencode'
       ? { opencode: input.opencode ?? { binaryPath: process.env.LARK_CHANNEL_OPENCODE_BIN ?? 'opencode' } }
       : {}),
+    ...(input.agentKind === 'grok'
+      ? { grok: input.grok ?? { binaryPath: process.env.LARK_CHANNEL_GROK_BIN ?? 'grok' } }
+      : {}),
   });
 }
 
@@ -112,7 +115,7 @@ export async function resolveProfileRuntime(
   if (!profile && opts.allowBootstrap) {
     const detected = await detectInstalledAgents();
     if (detected.length === 0) {
-      throw new Error('no supported local agent found; install claude, codex, or opencode first');
+      throw new Error('no supported local agent found; install claude, codex, opencode, or grok first');
     }
     if (detected.length > 1) {
       const selected = await selectDetectedAgent(detected, opts.selectAgent);

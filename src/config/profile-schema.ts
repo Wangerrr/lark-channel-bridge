@@ -13,7 +13,7 @@ import {
   type PermissionSource,
 } from './permissions';
 
-export type AgentKind = 'claude' | 'codex' | 'opencode';
+export type AgentKind = 'claude' | 'codex' | 'opencode' | 'grok';
 export type SandboxMode = CodexSandboxMode;
 export type { AccessMode, PermissionConfig, PermissionSource };
 
@@ -52,6 +52,12 @@ export interface CodexConfig {
 }
 
 export interface OpenCodeConfig {
+  binaryPath: string;
+  realpath?: string;
+  version?: string;
+}
+
+export interface GrokConfig {
   binaryPath: string;
   realpath?: string;
   version?: string;
@@ -167,6 +173,7 @@ export interface ProfileConfig {
   permissionSource?: PermissionSource;
   codex?: CodexConfig;
   opencode?: OpenCodeConfig;
+  grok?: GrokConfig;
   attachments: AttachmentConfig;
   comments: CommentConfig;
   /** In-meeting agent settings. See {@link MeetingConfig}. */
@@ -212,6 +219,7 @@ export interface CreateDefaultProfileConfigInput {
   permissions?: Partial<PermissionConfig>;
   codex?: CodexConfig;
   opencode?: OpenCodeConfig;
+  grok?: GrokConfig;
   secrets?: SecretsConfig;
 }
 
@@ -248,6 +256,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     permissions?: Partial<PermissionConfig>;
     codex?: CodexConfig & { flags?: unknown };
     opencode?: OpenCodeConfig;
+    grok?: GrokConfig;
     attachments?: Partial<AttachmentConfig>;
     comments?: unknown;
     meeting?: unknown;
@@ -257,8 +266,8 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   if (raw.schemaVersion !== 2) {
     throw new Error('profile schemaVersion must be 2');
   }
-  if (raw.agentKind !== 'claude' && raw.agentKind !== 'codex' && raw.agentKind !== 'opencode') {
-    throw new Error('agentKind must be claude, codex, or opencode');
+  if (!isAgentKind(raw.agentKind)) {
+    throw new Error('agentKind must be claude, codex, opencode, or grok');
   }
   const accounts = normalizeAccounts(raw.accounts);
   if (raw.agentKind === 'codex' && !raw.codex) {
@@ -266,6 +275,9 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   }
   if (raw.agentKind === 'opencode' && !raw.opencode) {
     throw new Error('opencode profile requires opencode configuration');
+  }
+  if (raw.agentKind === 'grok' && !raw.grok) {
+    throw new Error('grok profile requires grok configuration');
   }
 
   const preferences = normalizePreferences(raw.preferences);
@@ -297,6 +309,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     permissionSource,
     ...(raw.codex ? { codex: normalizeCodex(raw.codex) } : {}),
     ...(raw.opencode ? { opencode: normalizeOpenCode(raw.opencode) } : {}),
+    ...(raw.grok ? { grok: normalizeGrok(raw.grok) } : {}),
     attachments: {
       maxCount: numberOr(raw.attachments?.maxCount, 10),
       maxBytes: numberOr(raw.attachments?.maxBytes, 100 * 1024 * 1024),
@@ -405,14 +418,29 @@ function normalizeCodex(input: CodexConfig & { flags?: unknown }): CodexConfig {
 }
 
 function normalizeOpenCode(input: OpenCodeConfig): OpenCodeConfig {
+  return normalizeBinaryConfig(input, 'opencode.binaryPath is required');
+}
+
+function normalizeGrok(input: GrokConfig): GrokConfig {
+  return normalizeBinaryConfig(input, 'grok.binaryPath is required');
+}
+
+function normalizeBinaryConfig<T extends { binaryPath: string; realpath?: string; version?: string }>(
+  input: T,
+  missingBinary: string,
+): T {
   if (typeof input.binaryPath !== 'string' || !input.binaryPath.trim()) {
-    throw new Error('opencode.binaryPath is required');
+    throw new Error(missingBinary);
   }
   return {
     binaryPath: input.binaryPath,
     ...(typeof input.realpath === 'string' ? { realpath: input.realpath } : {}),
     ...(typeof input.version === 'string' ? { version: input.version } : {}),
-  };
+  } as T;
+}
+
+export function isAgentKind(value: unknown): value is AgentKind {
+  return value === 'claude' || value === 'codex' || value === 'opencode' || value === 'grok';
 }
 
 function normalizeComments(_input: unknown): CommentConfig {
