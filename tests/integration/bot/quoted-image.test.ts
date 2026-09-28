@@ -102,7 +102,9 @@ describe('quoted image attachments', () => {
     const imagePath = join(h.mediaDir, `${IMAGE_HASH}.png`);
     expect(h.agent.runOptions[0]?.images).toEqual([imagePath]);
     expect(h.agent.runOptions[0]?.prompt).toContain('<quoted_messages>');
-    expect(h.agent.runOptions[0]?.prompt).toContain(imagePath);
+    // buildAgentPrompt JSON-encodes the path, so Windows backslashes are escaped.
+    const encodedPath = JSON.stringify(imagePath).slice(1, -1);
+    expect(h.agent.runOptions[0]?.prompt).toContain(encodedPath);
     expect(h.agent.runOptions[0]?.prompt).not.toContain('![image](img_v3_quoted)');
   });
 });
