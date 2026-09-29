@@ -58,6 +58,7 @@ type StoredProfileConfig = Pick<
   | 'permissions'
   | 'codex'
   | 'opencode'
+  | 'grok'
   | 'attachments'
   | 'comments'
   | 'meeting'
@@ -98,6 +99,7 @@ function serializeProfileConfig(profile: ProfileConfig): StoredProfileConfig {
     permissions: profile.permissions,
     ...(profile.codex ? { codex: profile.codex } : {}),
     ...(profile.opencode ? { opencode: profile.opencode } : {}),
+    ...(profile.grok ? { grok: profile.grok } : {}),
     attachments: profile.attachments,
     comments: {},
     meeting: profile.meeting,

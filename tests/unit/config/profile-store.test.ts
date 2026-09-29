@@ -258,4 +258,30 @@ describe('profile store canonical serialization', () => {
 
     expect(root.migrations?.permissionDefaultsV1).toEqual(['claude']);
   });
+
+  it('persists a grok profile binary across save→load round-trip', async () => {
+    const root = await tmpRoot();
+    const configPath = join(root, 'config.json');
+    const profile = createDefaultProfileConfig({
+      agentKind: 'grok',
+      accounts: { app },
+      grok: { binaryPath: '/Users/ash/.grok/bin/grok' },
+    });
+
+    await saveRootConfig({
+      schemaVersion: 2,
+      activeProfile: 'grok',
+      preferences: {},
+      profiles: { grok: profile },
+    }, configPath);
+
+    const saved = JSON.parse(await readFile(configPath, 'utf8'));
+    expect(saved.profiles.grok.agentKind).toBe('grok');
+    expect(saved.profiles.grok.grok).toEqual({ binaryPath: '/Users/ash/.grok/bin/grok' });
+
+    const loaded = await loadRootConfig(configPath);
+    expect(loaded?.profiles.grok?.agentKind).toBe('grok');
+    expect(loaded?.profiles.grok?.grok?.binaryPath).toBe('/Users/ash/.grok/bin/grok');
+  });
+
 });
